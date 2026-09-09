@@ -139,7 +139,7 @@
                 <div class="space-x-1">
                     <button onclick="markAll(true)" class="text-[10px] text-indigo-600 hover:underline font-semibold">All P</button>
                     <span class="text-slate-300">|</span>
-                    <button onclick="resetData()" class="text-[10px] text-slate-400 hover:text-red-500 font-semibold" title="Reset today's attendance, duties and OFF classes (Keeps Master Routine safe)">Reset</button>
+                    <button onclick="resetData()" class="text-[10px] text-slate-400 hover:text-red-500 font-semibold" title="Reset today's attendance, duties and OFF classes">Reset</button>
                 </div>
             </div>
 
@@ -490,7 +490,8 @@
 
         function getGradeNumber(className) {
             if (!className) return 5;
-            return ROMAN_MAP[className.split('-')[0].trim().toUpperCase()] || 5;
+            const clean = className.split('-')[0].trim().toUpperCase();
+            return ROMAN_MAP[clean] || 5;
         }
 
         function isTeacherEligibleForGrade(teacherType, gradeNum) {
@@ -501,8 +502,41 @@
         }
 
         // =========================================================================
-        // FIXED DROPDOWNS: POPULATES "ALL" OPTION PROPERLY
+        // ACCURATE CLASS & SUBJECT EXTRACTOR (FIXES THE EXTRA ROWS ISSUE)
         // =========================================================================
+        function extractCleanClassAndSubject(rawCell) {
+            if (!rawCell) return [null, null];
+            let val = String(rawCell).trim().replace(/\n/g, ' ');
+            if (!val || val === '-' || val.startsWith('=')) return [null, null];
+
+            // Normalize classes: e.g. "V-A Math" -> Class "V-A", Subject "Math"
+            val = val.replace(/VI-\s*C/gi, 'VI-C').replace(/VI-\s*A/gi, 'VI-A').replace(/VI-\s*B/gi, 'VI-B')
+                     .replace(/VII-\s*A/gi, 'VII-A').replace(/VII-\s*B/gi, 'VII-B')
+                     .replace(/VIII-\s*A/gi, 'VIII-A').replace(/VIII-\s*B/gi, 'VIII-B')
+                     .replace(/V-\s*A/gi, 'V-A').replace(/V-\s*B/gi, 'V-B')
+                     .replace(/IX-\s*A/gi, 'IX-A').replace(/X-\s*A/gi, 'X-A');
+
+            // Match Standard Classes like V-A, VI-B, VII-A, IX-A, XI, XII, etc.
+            const match = val.match(/^(V|VI|VII|VIII|IX|X|XI|XII)(-[A-D]|-SC|-ARTS)?(\.)?/i);
+            if (match) {
+                let mainClass = match[0].replace(/\.$/, '').toUpperCase();
+                let remainingSubj = val.substring(match[0].length).trim();
+                return [mainClass, remainingSubj || 'General'];
+            }
+
+            const parts = val.split(' ');
+            return [parts[0].replace(/\.$/, ''), parts.slice(1).join(' ') || 'General'];
+        }
+
+        function sortClassesList(arr) {
+            return arr.sort((a, b) => {
+                const gA = getGradeNumber(a);
+                const gB = getGradeNumber(b);
+                if (gA !== gB) return gA - gB;
+                return a.localeCompare(b);
+            });
+        }
+
         function initActivityDropdowns() {
             const classSelect = document.getElementById('offClassSelect');
             const offPeriodSelect = document.getElementById('offPeriodSelect');
@@ -534,8 +568,6 @@
             const populatePeriods = (sel) => {
                 if (!sel) return;
                 sel.innerHTML = '';
-                
-                // Add ALL Option
                 const allOpt = document.createElement('option');
                 allOpt.value = 'ALL';
                 allOpt.innerText = 'ALL Periods';
@@ -552,9 +584,6 @@
             populatePeriods(dutyPeriodSelect);
         }
 
-        // =========================================================================
-        // FIXED CLASS OFF: SUPPORTS "ALL" TO SUSPEND ALL PERIODS
-        // =========================================================================
         function addSuspendedSlot() {
             const day = document.getElementById('daySelect')?.value || 'Monday';
             const cls = document.getElementById('offClassSelect')?.value;
@@ -598,9 +627,6 @@
             });
         }
 
-        // =========================================================================
-        // FIXED TEACHER DUTY: SUPPORTS "ALL" TO RELIEVE ALL PERIODS
-        // =========================================================================
         function addTeacherDutySlot() {
             const day = document.getElementById('daySelect')?.value || 'Monday';
             const tid = document.getElementById('dutyTeacherSelect')?.value;
@@ -647,6 +673,9 @@
             });
         }
 
+        // =========================================================================
+        // ROBUST EXCEL UPLOADER: MERGES SUBJECTS INTO SAME CLASS
+        // =========================================================================
         function handleExcelUpload(event) {
             const inputEl = event.target;
             const file = inputEl.files && inputEl.files[0];
@@ -697,13 +726,11 @@
 
                         Object.keys(dayColMap).forEach(d => {
                             dayColMap[d].forEach(pObj => {
-                                const val = String(row[pObj.colIdx] || '').trim();
-                                if (!val || val === '-') return;
-                                const parts = val.split(' ');
-                                const rawCls = parts[0];
-                                const subj = parts.slice(1).join(' ') || 'General';
-                                teacherSubjs.add(subj);
+                                const val = row[pObj.colIdx];
+                                const [rawCls, subj] = extractCleanClassAndSubject(val);
+                                if (!rawCls) return;
 
+                                teacherSubjs.add(subj);
                                 const gNum = getGradeNumber(rawCls);
                                 if (gNum < minGrade) minGrade = gNum;
                                 if (gNum > maxGrade) maxGrade = gNum;
@@ -744,14 +771,14 @@
                     }
 
                     TEACHERS = parsedTeachers;
-                    CLASSES = Array.from(classSet).sort();
+                    CLASSES = sortClassesList(Array.from(classSet));
                     masterSchedule = newMasterSched;
                     manualOverrides = {};
 
                     saveState();
                     initActivityDropdowns();
                     runAutoSubstitution();
-                    alert("✅ Master routine loaded successfully!");
+                    alert("✅ Master routine loaded cleanly with organized classes!");
                 } catch (err) {
                     alert("Error: " + err.message);
                 } finally {
@@ -861,7 +888,7 @@
                 });
             }
 
-            // Step 2: Allocate Substitutes (With Strict Anti-Duplicate & 8th Period V-VIII Ban)
+            // Step 2: Allocate Substitutes
             for (let p = 1; p <= numPeriods; p++) {
                 const pKey = `P${p}`;
                 const jointAssigned = {};
@@ -891,14 +918,14 @@
                             let minLoad = 999;
 
                             TEACHERS.filter(t => t.isPresent && !teacherPeriodBusy[t.id][pKey]).forEach(cand => {
-                                // Type 3 (V-VIII) teachers never get 8th period
+                                // Type 3 (V-VIII) never gets 8th period
                                 if (pKey === 'P8' && cand.type === 'Type 3') return;
 
                                 const load = (teacherPresentScheduledMap[cand.id] || 0) + (teacherProvisionalMap[cand.id] || 0);
                                 if (load >= maxDailyAllowed) return;
                                 if (!isTeacherEligibleForGrade(cand.type, targetGrade)) return;
 
-                                // Prevent 2 classes in same class
+                                // Anti-repetition: Teacher already in this class today
                                 const alreadyTaughtThisClass = teacherClassesTaughtToday[cand.id] && (
                                     teacherClassesTaughtToday[cand.id].has(cls) || 
                                     (isHSJoint && (teacherClassesTaughtToday[cand.id].has(`${gradePrefix}-SC`) || teacherClassesTaughtToday[cand.id].has(`${gradePrefix}-ARTS`)))
