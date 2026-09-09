@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FULIA VIDYAMANDIR Portal (Admin)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS with Full Style Support (xlsx-js-style) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            .print-full { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+            body { background: white !important; font-size: 10px; }
+            .page-break { page-break-before: always; }
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 pb-16 lg:pb-6">
+
+    <script>
+        const FIREBASE_DB_URL = "https://school-routine-prasenjit-default-rtdb.firebaseio.com/";
+        const MASTER_RENEWAL_KEY = "FULIA@2026"; 
+    </script>
+
+    <!-- License Expiry Overlay Modal -->
+    <div id="licenseLockModal" class="fixed inset-0 bg-slate-950/90 z-[9999] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 text-center shadow-2xl border-4 border-rose-500">
+            <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-black">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <h2 class="text-xl font-bold text-slate-800 mb-1">Software License Expired!</h2>
+            <p class="text-xs text-slate-500 mb-4">Your 1-month authorized validity period has ended. Please renew the license from the software developer.</p>
+            
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-left text-xs mb-4">
+                <div class="font-bold text-slate-700">Developer Contact:</div>
+                <div class="text-indigo-600 font-semibold mt-0.5"><i class="fa-solid fa-user-gear mr-1"></i> Prasenjit Nath</div>
+                <div class="text-slate-600 font-semibold"><i class="fa-solid fa-phone mr-1"></i> 9735296618</div>
+            </div>
+
+            <div class="space-y-2">
+                <input type="password" id="renewalKeyInput" placeholder="Enter Monthly Activation Key" class="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-center focus:outline-none focus:ring-2 focus:ring-rose-500">
+                <button onclick="submitLicenseRenewal()" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded-lg text-xs transition shadow-md">
+                    Activate Next 30 Days
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header Navigation -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50 no-print">
+        <div class="max-w-7xl mx-auto px-3 py-2.5 flex flex-wrap justify-between items-center gap-2">
+            <div class="flex items-center space-x-2.5">
+                <i class="fa-solid fa-school-flag text-xl text-amber-400"></i>
+                <div>
+                    <h1 class="text-sm md:text-base font-bold tracking-wide">FULIA VIDYAMANDIR Master Timetable Portal</h1>
+                    <p class="text-[10px] text-slate-400">Software created by Prasenjit Nath. • Mob : 9735296618</p>
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-1.5">
+                <div class="flex items-center bg-slate-800 rounded px-2 py-1 border border-slate-700">
+                    <label for="daySelect" class="text-[10px] font-semibold mr-1.5 text-slate-300">DAY:</label>
+                    <select id="daySelect" class="bg-slate-900 text-white text-xs font-semibold rounded focus:outline-none cursor-pointer">
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center bg-amber-950/60 rounded px-2 py-1 border border-amber-700/60">
+                    <label for="periodCountSelect" class="text-[10px] font-bold mr-1 text-amber-300">
+                        <i class="fa-solid fa-clock mr-0.5"></i>Periods:
+                    </label>
+                    <select id="periodCountSelect" class="bg-amber-900 text-white text-xs font-bold rounded focus:outline-none cursor-pointer">
+                        <option value="8">8 Periods</option>
+                        <option value="7">7 Periods</option>
+                        <option value="6">6 Periods</option>
+                        <option value="5">5 Periods (Early Close)</option>
+                        <option value="4">4 Periods (Half Day / Sat)</option>
+                        <option value="3">3 Periods</option>
+                    </select>
+                </div>
+
+                <!-- PUBLISH & SHARE -->
+                <button onclick="publishAndShareCleanLink()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-bold transition flex items-center gap-1.5 shadow-md animate-pulse">
+                    <i class="fa-brands fa-whatsapp text-sm"></i> Share Link
+                </button>
+
+                <button onclick="document.getElementById('excelFileInput').click()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded text-xs font-semibold transition flex items-center gap-1 shadow">
+                    <i class="fa-solid fa-file-arrow-up text-amber-300"></i> Upload Master
+                </button>
+                <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display:none;" onchange="handleExcelUpload(event)">
+
+                <button onclick="exportDailyExcel()" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white px-2.5 py-1 rounded text-xs font-semibold transition flex items-center gap-1 shadow">
+                    <i class="fa-solid fa-file-excel text-rose-400"></i> Export Excel
+                </button>
+
+                <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-600 text-white px-2.5 py-1 rounded text-xs font-semibold transition flex items-center gap-1">
+                    <i class="fa-solid fa-print"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Mobile View Tab Bar -->
+    <div class="lg:hidden bg-white border-b border-slate-200 px-2 py-1.5 flex justify-around text-xs font-bold text-slate-600 sticky top-12 z-40 shadow-sm no-print">
+        <button id="tabBtnRoutine" onclick="switchMobileTab('routine')" class="py-1 px-3 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center gap-1">
+            <i class="fa-solid fa-clipboard-list"></i> Routine
+        </button>
+        <button id="tabBtnTeachers" onclick="switchMobileTab('teachers')" class="py-1 px-3 rounded-lg text-slate-600 hover:bg-slate-50 flex items-center gap-1">
+            <i class="fa-solid fa-users"></i> Teachers (<span id="mobileTeacherCount">0</span>)
+        </button>
+        <button id="tabBtnDuties" onclick="switchMobileTab('duties')" class="py-1 px-3 rounded-lg text-slate-600 hover:bg-slate-50 flex items-center gap-1">
+            <i class="fa-solid fa-gear"></i> Duties / OFF
+        </button>
+    </div>
+
+    <div class="max-w-7xl mx-auto p-3 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6">
+
+        <!-- Left Sidebar -->
+        <div id="sectionTeachers" class="hidden lg:flex lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 p-3.5 no-print flex-col lg:h-[calc(100vh-110px)] lg:sticky lg:top-20">
+            <div class="flex justify-between items-center pb-2.5 border-b border-slate-200">
+                <div>
+                    <h2 class="font-bold text-slate-800 flex items-center gap-1.5 text-xs md:text-sm">
+                        <i class="fa-solid fa-user-check text-indigo-600"></i> Faculty & Workload
+                    </h2>
+                    <p class="text-[10px] text-slate-500" id="attendanceSummary">Loading...</p>
+                </div>
+                <div class="space-x-1">
+                    <button onclick="markAll(true)" class="text-[10px] text-indigo-600 hover:underline font-semibold">All P</button>
+                    <span class="text-slate-300">|</span>
+                    <button onclick="resetData()" class="text-[10px] text-slate-400 hover:text-red-500 font-semibold" title="Reset today's attendance, duties and OFF classes (Keeps Master Routine safe)">Reset</button>
+                </div>
+            </div>
+
+            <div class="mt-2 text-[9px] grid grid-cols-2 gap-1 text-center font-bold">
+                <span class="bg-cyan-50 text-cyan-800 py-0.5 rounded border border-cyan-200">🔬 Science & Math</span>
+                <span class="bg-emerald-50 text-emerald-800 py-0.5 rounded border border-emerald-200">📖 Language</span>
+                <span class="bg-orange-50 text-orange-800 py-0.5 rounded border border-orange-200">🏛️ Humanities</span>
+                <span class="bg-indigo-50 text-indigo-800 py-0.5 rounded border border-indigo-200">🎨 Activity/Voc</span>
+            </div>
+
+            <div class="my-2.5 relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                <input type="text" id="teacherSearch" placeholder="Search teacher, subject..." class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+
+            <div id="teacherList" class="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar text-xs max-h-[60vh] lg:max-h-none"></div>
+        </div>
+
+        <!-- Right Main Panel -->
+        <div id="sectionRoutine" class="lg:col-span-3 space-y-4 md:space-y-6 print-full">
+
+            <!-- Stats Bar -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 md:gap-4 no-print">
+                <div class="bg-white p-2.5 md:p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-2.5">
+                    <div class="p-2 bg-red-50 text-red-600 rounded-lg text-base"><i class="fa-solid fa-user-slash"></i></div>
+                    <div>
+                        <div class="text-base md:text-lg font-bold text-slate-800" id="statAbsentCount">0</div>
+                        <div class="text-[10px] text-slate-500 font-medium">Absent Teachers</div>
+                    </div>
+                </div>
+                <div class="bg-white p-2.5 md:p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-2.5">
+                    <div class="p-2 bg-amber-50 text-amber-600 rounded-lg text-base"><i class="fa-solid fa-repeat"></i></div>
+                    <div>
+                        <div class="text-base md:text-lg font-bold text-slate-800" id="statSubCount">0</div>
+                        <div class="text-[10px] text-slate-500 font-medium">Substitutions</div>
+                    </div>
+                </div>
+                <div class="bg-white p-2.5 md:p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-2.5">
+                    <div class="p-2 bg-emerald-50 text-emerald-600 rounded-lg text-base"><i class="fa-solid fa-people-arrows"></i></div>
+                    <div>
+                        <div class="text-base md:text-lg font-bold text-emerald-700" id="statJointCount">0</div>
+                        <div class="text-[10px] text-slate-500 font-medium">XI & XII Joint</div>
+                    </div>
+                </div>
+                <div class="bg-white p-2.5 md:p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-2.5">
+                    <div class="p-2 bg-blue-50 text-blue-600 rounded-lg text-base"><i class="fa-solid fa-id-badge"></i></div>
+                    <div>
+                        <div class="text-base md:text-lg font-bold text-blue-700" id="statTeacherDutyCount">0</div>
+                        <div class="text-[10px] text-slate-500 font-medium">Special Duties</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dual Manager -->
+            <div id="sectionDuties" class="hidden lg:grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 no-print">
+                <!-- Class Period OFF -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
+                    <div class="flex items-center justify-between pb-1.5 border-b border-slate-200 mb-2">
+                        <h3 class="font-bold text-xs text-slate-800 uppercase flex items-center gap-1.5">
+                            <i class="fa-solid fa-calendar-xmark text-purple-600"></i> Class Period OFF
+                        </h3>
+                    </div>
+                    <div class="grid grid-cols-3 gap-1.5 items-end">
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-600 mb-0.5">Class:</label>
+                            <select id="offClassSelect" class="w-full bg-slate-50 border border-slate-300 rounded px-1.5 py-1 text-xs font-semibold focus:outline-none"></select>
+                        </div>
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-600 mb-0.5">Period:</label>
+                            <select id="offPeriodSelect" class="w-full bg-slate-50 border border-slate-300 rounded px-1.5 py-1 text-xs font-semibold focus:outline-none"></select>
+                        </div>
+                        <div>
+                            <button onclick="addSuspendedSlot()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-1 rounded text-xs transition shadow-sm">Set OFF</button>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-1.5 border-t border-slate-100 flex flex-wrap gap-1" id="activeSuspendedBadges"></div>
+                </div>
+
+                <!-- Teacher Program Duty -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
+                    <div class="flex items-center justify-between pb-1.5 border-b border-slate-200 mb-2">
+                        <h3 class="font-bold text-xs text-slate-800 uppercase flex items-center gap-1.5">
+                            <i class="fa-solid fa-id-badge text-blue-600"></i> Teacher Program Duty
+                        </h3>
+                    </div>
+                    <div class="grid grid-cols-3 gap-1.5 items-end">
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-600 mb-0.5">Teacher:</label>
+                            <select id="dutyTeacherSelect" class="w-full bg-slate-50 border border-slate-300 rounded px-1.5 py-1 text-xs font-semibold focus:outline-none"></select>
+                        </div>
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-600 mb-0.5">Period:</label>
+                            <select id="dutyPeriodSelect" class="w-full bg-slate-50 border border-slate-300 rounded px-1.5 py-1 text-xs font-semibold focus:outline-none"></select>
+                        </div>
+                        <div>
+                            <button onclick="addTeacherDutySlot()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-1 rounded text-xs transition shadow-sm">Set Duty</button>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-1.5 border-t border-slate-100 flex flex-wrap gap-1" id="activeTeacherDutyBadges"></div>
+                </div>
+            </div>
+
+            <!-- Daily Substitution Notice Board -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-800 text-white px-3 py-2.5 flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-clipboard-list text-amber-400"></i>
+                        <h2 class="font-bold text-xs tracking-wide uppercase">Daily Substitution Notice Board</h2>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="clearManualOverrides()" class="bg-slate-700 hover:bg-slate-600 text-amber-300 px-2 py-0.5 rounded text-[10px] font-semibold transition flex items-center gap-1">
+                            <i class="fa-solid fa-rotate-left"></i> Reset to Auto
+                        </button>
+                        <span id="currentDayBadge" class="text-[10px] bg-slate-700 px-2 py-0.5 rounded-full text-indigo-200 font-semibold">Monday</span>
+                    </div>
+                </div>
+                <div class="p-2.5 md:p-4 overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                                <th class="py-2 px-2.5">Period</th>
+                                <th class="py-2 px-2.5">Class</th>
+                                <th class="py-2 px-2.5">Subject</th>
+                                <th class="py-2 px-2.5 text-red-600">Absent / Duty</th>
+                                <th class="py-2 px-2.5 text-emerald-700 w-48 md:w-60">Substitute (Editable)</th>
+                                <th class="py-2 px-2.5">Type</th>
+                                <th class="py-2 px-2.5 text-center">Class Nature</th>
+                            </tr>
+                        </thead>
+                        <tbody id="substitutionTableBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                    <div id="noSubstitutionMsg" class="py-5 text-center text-slate-400 text-xs">
+                        <i class="fa-solid fa-circle-check text-emerald-500 text-base mb-1"></i>
+                        <p>All assigned teachers are present today for active periods.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Faculty Daily Load Breakdown Table -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden no-print">
+                <div class="bg-slate-700 text-white px-3 py-2 flex justify-between items-center">
+                    <div class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-chart-simple text-emerald-400"></i>
+                        <h2 class="font-bold text-[11px] md:text-xs tracking-wide uppercase">Faculty Daily Load Breakdown</h2>
+                    </div>
+                    <span id="maxLoadLabel" class="text-[9px] text-slate-300">Limit: ≤ 5 Periods/Day</span>
+                </div>
+                <div class="p-2 max-h-56 overflow-y-auto custom-scrollbar">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead class="sticky top-0 bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-[11px]">
+                            <tr>
+                                <th class="py-1 px-2">Code</th>
+                                <th class="py-1 px-2">Teacher Name</th>
+                                <th class="py-1 px-2 text-center">Sched</th>
+                                <th class="py-1 px-2 text-center">Sub Added</th>
+                                <th class="py-1 px-2 text-center">Total</th>
+                                <th class="py-1 px-2 text-center">Duty / Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="workloadSummaryTableBody" class="divide-y divide-slate-100 text-[11px]"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Full Daily Timetable Grid -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden page-break">
+                <div class="bg-indigo-950 text-white px-3 py-2.5 flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-table-cells text-indigo-400"></i>
+                        <h2 class="font-bold text-xs tracking-wide uppercase">Provisional Class Timetable (V to XII)</h2>
+                    </div>
+                    <div class="text-[10px] text-slate-300 flex items-center gap-2">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 bg-purple-200 border border-purple-300 rounded inline-block"></span> Joint</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 bg-rose-200 border border-rose-400 rounded inline-block"></span> Sub (Red)</span>
+                    </div>
+                </div>
+                <div class="p-2 md:p-4 overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-center text-[11px] md:text-xs border-collapse border border-slate-200" id="gridTable">
+                        <thead id="gridHeader" class="bg-slate-100 text-slate-700 font-bold"></thead>
+                        <tbody id="gridBody" class="divide-y divide-slate-200"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Core Engine -->
+    <script>
+        function checkSoftwareLicense() {
+            const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+            let activationTimestamp = localStorage.getItem('fv_install_timestamp');
+            if (!activationTimestamp) {
+                activationTimestamp = Date.now().toString();
+                localStorage.setItem('fv_install_timestamp', activationTimestamp);
+            }
+            const currentTimestamp = Date.now();
+            const elapsed = currentTimestamp - parseInt(activationTimestamp, 10);
+            if (elapsed > ONE_MONTH_MS || elapsed < 0) {
+                document.getElementById('licenseLockModal').classList.remove('hidden');
+                return false;
+            }
+            return true;
+        }
+
+        function submitLicenseRenewal() {
+            const val = document.getElementById('renewalKeyInput').value.trim();
+            if (val === MASTER_RENEWAL_KEY) {
+                localStorage.setItem('fv_install_timestamp', Date.now().toString());
+                document.getElementById('licenseLockModal').classList.add('hidden');
+                alert("✅ License activated successfully!");
+                location.reload();
+            } else {
+                alert("❌ Invalid Activation Key!");
+            }
+        }
+
+        const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const ROMAN_MAP = {'V': 5, 'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10, 'XI': 11, 'XII': 12};
+        const HS_COMMON_LANGUAGES = ['BEN', 'BENGALI', 'ENG', 'ENGLISH', 'EVS', 'EVC'];
+        const HS_SCIENCE_SUBJECTS = ['PHYS', 'PHYSICS', 'CHEM', 'CHEMISTRY', 'BIOLOGY', 'BIO', 'BIOS', 'LSC', 'L.SC', 'PSC', 'P.SC', 'COM', 'COMA', 'COMS', 'SCIENCE', 'MATH', 'STAT'];
+        const HS_ARTS_SUBJECTS = ['HIST', 'HISTORY', 'GEO', 'GEOGRAPHY', 'POL', 'POLSCIENCE', 'EDU', 'EDUCATION', 'SANS', 'SANSKRIT', 'AP', 'A.P', 'PHIL', 'ECON'];
+
+        const SUBJECT_STREAMS = {
+            'SCIENCE_MATH': ['MATH', 'SCIENCE', 'PHYS', 'CHEM', 'PSC', 'LSC', 'BIOLOGY', 'BIO', 'BIOS', 'EVS', 'EVC'],
+            'LANGUAGES': ['BEN', 'BENGALI', 'ENG', 'ENGLISH', 'SANS', 'SANSKRIT', 'HINDI'],
+            'HUMANITIES': ['HIST', 'HISTORY', 'GEO', 'GEOGRAPHY', 'POL', 'POLSCIENCE', 'EDU', 'EDUCATION', 'AP'],
+            'WORK_VOC_ACTIVITY': ['WEDU', 'WED', 'WORKED', 'PEDU', 'PEDUCATION', 'COM', 'COMPUTER', 'LIB', 'LIBRARY', 'PLBV', 'BWLV']
+        };
+
+        function safeSetText(elementId, text) {
+            const el = document.getElementById(elementId);
+            if (el) el.innerText = text;
+        }
+
+        function normalizeSubj(s) {
+            return s ? String(s).replace(/[\.\s]/g, '').toUpperCase() : '';
+        }
+
+        function isHSCommonSubject(subj) {
+            return HS_COMMON_LANGUAGES.includes(normalizeSubj(subj));
+        }
+
+        function isHSScienceSubject(subj) {
+            return HS_SCIENCE_SUBJECTS.includes(normalizeSubj(subj));
+        }
+
+        function isHSArtsSubject(subj) {
+            return HS_ARTS_SUBJECTS.includes(normalizeSubj(subj));
+        }
+
+        function getSubjectStream(subjectName) {
+            const norm = normalizeSubj(subjectName);
+            if (!norm) return 'GENERAL';
+            for (const [streamKey, subjList] of Object.entries(SUBJECT_STREAMS)) {
+                if (subjList.includes(norm)) return streamKey;
+            }
+            return 'GENERAL';
+        }
+
+        function getStreamDisplayName(streamKey) {
+            switch(streamKey) {
+                case 'SCIENCE_MATH': return '🔬 Science';
+                case 'LANGUAGES': return '📖 Language';
+                case 'HUMANITIES': return '🏛️ Arts';
+                default: return '🎨 Activity';
+            }
+        }
+
+        function loadStorage(key, fallback) {
+            try {
+                const raw = localStorage.getItem(key);
+                return raw ? JSON.parse(raw) : fallback;
+            } catch(e) { return fallback; }
+        }
+
+        let CLASSES = loadStorage('hs_classes_joint_v2', ['V-A', 'V-B', 'VI-A', 'VII-A', 'VIII-A', 'IX-A', 'X-A', 'XI-SC', 'XI-ARTS', 'XII-SC', 'XII-ARTS']);
+        let TEACHERS = loadStorage('hs_teachers_joint_v2', []);
+        let masterSchedule = loadStorage('hs_master_schedule_joint_v2', {});
+        let manualOverrides = loadStorage('hs_manual_overrides_joint_v2', {});
+        let suspendedSlots = loadStorage('hs_suspended_slots_joint_v2', {});
+        let teacherDutySlots = loadStorage('hs_teacher_duty_joint_v2', {});
+
+        let teacherDailyWorkloads = {};
+        let latestGeneratedDailyGrid = {};
+        let latestGeneratedSubstitutions = [];
+
+        function saveState() {
+            try {
+                localStorage.setItem('hs_teachers_joint_v2', JSON.stringify(TEACHERS));
+                localStorage.setItem('hs_master_schedule_joint_v2', JSON.stringify(masterSchedule));
+                localStorage.setItem('hs_classes_joint_v2', JSON.stringify(CLASSES));
+                localStorage.setItem('hs_manual_overrides_joint_v2', JSON.stringify(manualOverrides));
+                localStorage.setItem('hs_suspended_slots_joint_v2', JSON.stringify(suspendedSlots));
+                localStorage.setItem('hs_teacher_duty_joint_v2', JSON.stringify(teacherDutySlots));
+            } catch(e) {}
+        }
+
+        function resetData() {
+            if (confirm("Reset today's routine changes?\n\n• All teachers will be marked Present\n• All OFF periods & Special Duties will be cleared\n• Your uploaded Master Timetable will remain completely SAFE!")) {
+                TEACHERS.forEach(t => t.isPresent = true);
+                suspendedSlots = {};
+                teacherDutySlots = {};
+                manualOverrides = {};
+                saveState();
+                renderSuspendedBadges();
+                renderTeacherDutyBadges();
+                runAutoSubstitution();
+                alert("✅ Daily attendance, OFF classes, and duties have been reset to normal!\n\nMaster routine is safe.");
+            }
+        }
+
+        function clearManualOverrides() {
+            manualOverrides = {};
+            saveState();
+            runAutoSubstitution();
+        }
+
+        function switchMobileTab(tab) {
+            const secRoutine = document.getElementById('sectionRoutine');
+            const secTeachers = document.getElementById('sectionTeachers');
+            const secDuties = document.getElementById('sectionDuties');
+            const btnRoutine = document.getElementById('tabBtnRoutine');
+            const btnTeachers = document.getElementById('tabBtnTeachers');
+            const btnDuties = document.getElementById('tabBtnDuties');
+
+            [btnRoutine, btnTeachers, btnDuties].forEach(b => {
+                b.className = "py-1 px-3 rounded-lg text-slate-600 hover:bg-slate-50 flex items-center gap-1";
+            });
+
+            if (tab === 'routine') {
+                secRoutine.classList.remove('hidden');
+                secTeachers.classList.add('hidden');
+                secDuties.classList.add('hidden');
+                btnRoutine.className = "py-1 px-3 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center gap-1 font-bold";
+            } else if (tab === 'teachers') {
+                secRoutine.classList.add('hidden');
+                secTeachers.classList.remove('hidden');
+                secDuties.classList.add('hidden');
+                btnTeachers.className = "py-1 px-3 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center gap-1 font-bold";
+            } else if (tab === 'duties') {
+                secRoutine.classList.remove('hidden');
+                secTeachers.classList.add('hidden');
+                secDuties.classList.remove('hidden');
+                btnDuties.className = "py-1 px-3 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center gap-1 font-bold";
+            }
+        }
+
+        function getGradeNumber(className) {
+            if (!className) return 5;
+            return ROMAN_MAP[className.split('-')[0].trim().toUpperCase()] || 5;
+        }
+
+        function isTeacherEligibleForGrade(teacherType, gradeNum) {
+            if (teacherType === 'Type 4') return gradeNum >= 11;
+            if (teacherType === 'Type 3') return gradeNum <= 8;
+            if (teacherType === 'Type 2') return gradeNum <= 10;
+            return true;
+        }
+
+        // =========================================================================
+        // FIXED DROPDOWNS: POPULATES "ALL" OPTION PROPERLY
+        // =========================================================================
+        function initActivityDropdowns() {
+            const classSelect = document.getElementById('offClassSelect');
+            const offPeriodSelect = document.getElementById('offPeriodSelect');
+            const dutyTeacherSelect = document.getElementById('dutyTeacherSelect');
+            const dutyPeriodSelect = document.getElementById('dutyPeriodSelect');
+            const periodCountEl = document.getElementById('periodCountSelect');
+            const numPeriods = periodCountEl ? parseInt(periodCountEl.value, 10) : 8;
+
+            if (classSelect) {
+                classSelect.innerHTML = '';
+                CLASSES.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c;
+                    opt.innerText = c;
+                    classSelect.appendChild(opt);
+                });
+            }
+
+            if (dutyTeacherSelect) {
+                dutyTeacherSelect.innerHTML = '';
+                TEACHERS.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t.id;
+                    opt.innerText = `${t.name} (${t.id})`;
+                    dutyTeacherSelect.appendChild(opt);
+                });
+            }
+
+            const populatePeriods = (sel) => {
+                if (!sel) return;
+                sel.innerHTML = '';
+                
+                // Add ALL Option
+                const allOpt = document.createElement('option');
+                allOpt.value = 'ALL';
+                allOpt.innerText = 'ALL Periods';
+                sel.appendChild(allOpt);
+
+                for (let p = 1; p <= numPeriods; p++) {
+                    const opt = document.createElement('option');
+                    opt.value = `P${p}`;
+                    opt.innerText = `P${p}`;
+                    sel.appendChild(opt);
+                }
+            };
+            populatePeriods(offPeriodSelect);
+            populatePeriods(dutyPeriodSelect);
+        }
+
+        // =========================================================================
+        // FIXED CLASS OFF: SUPPORTS "ALL" TO SUSPEND ALL PERIODS
+        // =========================================================================
+        function addSuspendedSlot() {
+            const day = document.getElementById('daySelect')?.value || 'Monday';
+            const cls = document.getElementById('offClassSelect')?.value;
+            const period = document.getElementById('offPeriodSelect')?.value;
+            if (!cls || !period) return;
+            
+            const numPeriods = parseInt(document.getElementById('periodCountSelect')?.value || '8', 10);
+
+            if (period === 'ALL') {
+                for (let p = 1; p <= numPeriods; p++) {
+                    suspendedSlots[`${day}_P${p}_${cls}`] = { day, period: `P${p}`, cls, reason: 'Activity' };
+                }
+            } else {
+                suspendedSlots[`${day}_${period}_${cls}`] = { day, period, cls, reason: 'Activity' };
+            }
+
+            saveState();
+            renderSuspendedBadges();
+            runAutoSubstitution();
+        }
+
+        function removeSuspendedSlot(key) {
+            delete suspendedSlots[key];
+            saveState();
+            renderSuspendedBadges();
+            runAutoSubstitution();
+        }
+
+        function renderSuspendedBadges() {
+            const container = document.getElementById('activeSuspendedBadges');
+            if (!container) return;
+            container.innerHTML = '';
+            const day = document.getElementById('daySelect')?.value || 'Monday';
+            const activeForDay = Object.entries(suspendedSlots || {}).filter(([k, v]) => v && v.day === day);
+
+            activeForDay.forEach(([key, item]) => {
+                const badge = document.createElement('span');
+                badge.className = "bg-purple-100 text-purple-900 border border-purple-300 rounded px-1.5 py-0.5 text-[9px] font-bold inline-flex items-center gap-1";
+                badge.innerHTML = `<span>🚫 <b>${item.cls}</b> (${item.period})</span> <button onclick="removeSuspendedSlot('${key}')" class="text-purple-600 font-black cursor-pointer">×</button>`;
+                container.appendChild(badge);
+            });
+        }
+
+        // =========================================================================
+        // FIXED TEACHER DUTY: SUPPORTS "ALL" TO RELIEVE ALL PERIODS
+        // =========================================================================
+        function addTeacherDutySlot() {
+            const day = document.getElementById('daySelect')?.value || 'Monday';
+            const tid = document.getElementById('dutyTeacherSelect')?.value;
+            const period = document.getElementById('dutyPeriodSelect')?.value;
+            if (!tid || !period) return;
+            
+            const numPeriods = parseInt(document.getElementById('periodCountSelect')?.value || '8', 10);
+            const tObj = TEACHERS.find(t => t.id === tid);
+            const tname = tObj ? tObj.name : tid;
+
+            if (period === 'ALL') {
+                for (let p = 1; p <= numPeriods; p++) {
+                    teacherDutySlots[`${day}_P${p}_${tid}`] = { day, period: `P${p}`, tid, tname, reason: 'Special Duty' };
+                }
+            } else {
+                teacherDutySlots[`${day}_${period}_${tid}`] = { day, period, tid, tname, reason: 'Special Duty' };
+            }
+
+            saveState();
+            renderTeacherDutyBadges();
+            runAutoSubstitution();
+        }
+
+        function removeTeacherDutySlot(key) {
+            delete teacherDutySlots[key];
+            saveState();
+            renderTeacherDutyBadges();
+            runAutoSubstitution();
+        }
+
+        function renderTeacherDutyBadges() {
+            const container = document.getElementById('activeTeacherDutyBadges');
+            if (!container) return;
+            container.innerHTML = '';
+            const day = document.getElementById('daySelect')?.value || 'Monday';
+            const activeForDay = Object.entries(teacherDutySlots || {}).filter(([k, v]) => v && v.day === day);
+            safeSetText('statTeacherDutyCount', activeForDay.length);
+
+            activeForDay.forEach(([key, item]) => {
+                const badge = document.createElement('span');
+                badge.className = "bg-blue-100 text-blue-900 border border-blue-300 rounded px-1.5 py-0.5 text-[9px] font-bold inline-flex items-center gap-1";
+                badge.innerHTML = `<span>🎖️ <b>${item.tname}</b> (${item.period})</span> <button onclick="removeTeacherDutySlot('${key}')" class="text-blue-600 font-black cursor-pointer">×</button>`;
+                container.appendChild(badge);
+            });
+        }
+
+        function handleExcelUpload(event) {
+            const inputEl = event.target;
+            const file = inputEl.files && inputEl.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                    const row0 = rawRows[0] || [];
+                    const row1 = rawRows[1] || [];
+                    const dayColMap = {};
+                    let currDay = null;
+
+                    for (let cIdx = 0; cIdx < row0.length; cIdx++) {
+                        const cell0Str = String(row0[cIdx] || '').trim().toUpperCase();
+                        for (let d of DAYS) {
+                            if (cell0Str.includes(d.toUpperCase())) {
+                                currDay = d;
+                                if (!dayColMap[currDay]) dayColMap[currDay] = [];
+                                break;
+                            }
+                        }
+                        if (currDay && cIdx < row1.length && /^\d+$/.test(String(row1[cIdx] || '').trim())) {
+                            dayColMap[currDay].push({ period: parseInt(row1[cIdx], 10), colIdx: cIdx });
+                        }
+                    }
+
+                    const parsedTeachers = [];
+                    const classSet = new Set();
+                    const newMasterSched = {};
+                    DAYS.forEach(d => { newMasterSched[d] = {}; });
+
+                    for (let r = 2; r < rawRows.length; r++) {
+                        const row = rawRows[r];
+                        if (!row || row.length < 3) continue;
+
+                        const tname = String(row[1] || '').trim();
+                        let tshort = String(row[2] || tname.substring(0,3)).trim().toUpperCase();
+                        if (!tname || tname === 'undefined') continue;
+
+                        const teacherSubjs = new Set();
+                        let minGrade = 99, maxGrade = 0;
+
+                        Object.keys(dayColMap).forEach(d => {
+                            dayColMap[d].forEach(pObj => {
+                                const val = String(row[pObj.colIdx] || '').trim();
+                                if (!val || val === '-') return;
+                                const parts = val.split(' ');
+                                const rawCls = parts[0];
+                                const subj = parts.slice(1).join(' ') || 'General';
+                                teacherSubjs.add(subj);
+
+                                const gNum = getGradeNumber(rawCls);
+                                if (gNum < minGrade) minGrade = gNum;
+                                if (gNum > maxGrade) maxGrade = gNum;
+
+                                if (gNum >= 11) {
+                                    const gradeName = (gNum === 11) ? 'XI' : 'XII';
+                                    if (isHSCommonSubject(subj)) {
+                                        ['SC', 'ARTS'].forEach(sec => {
+                                            const cName = `${gradeName}-${sec}`;
+                                            classSet.add(cName);
+                                            if (!newMasterSched[d][cName]) newMasterSched[d][cName] = {};
+                                            newMasterSched[d][cName][`P${pObj.period}`] = { subject: subj, tid: tshort, tname: tname, isJoint: true };
+                                        });
+                                    } else {
+                                        const cName = `${gradeName}-${rawCls.toUpperCase().includes('ARTS') ? 'ARTS' : 'SC'}`;
+                                        classSet.add(cName);
+                                        if (!newMasterSched[d][cName]) newMasterSched[d][cName] = {};
+                                        newMasterSched[d][cName][`P${pObj.period}`] = { subject: subj, tid: tshort, tname: tname, isJoint: false };
+                                    }
+                                } else {
+                                    classSet.add(rawCls);
+                                    if (!newMasterSched[d][rawCls]) newMasterSched[d][rawCls] = {};
+                                    newMasterSched[d][rawCls][`P${pObj.period}`] = { subject: subj, tid: tshort, tname: tname, isJoint: false };
+                                }
+                            });
+                        });
+
+                        parsedTeachers.push({
+                            id: tshort,
+                            name: tname,
+                            short: tshort,
+                            dept: Array.from(teacherSubjs)[0] || 'General',
+                            subjs: Array.from(teacherSubjs),
+                            stream: getSubjectStream(Array.from(teacherSubjs)[0]),
+                            type: (minGrade >= 11) ? 'Type 4' : (maxGrade >= 11 ? 'Type 1' : (maxGrade >= 9 ? 'Type 2' : 'Type 3')),
+                            isPresent: true
+                        });
+                    }
+
+                    TEACHERS = parsedTeachers;
+                    CLASSES = Array.from(classSet).sort();
+                    masterSchedule = newMasterSched;
+                    manualOverrides = {};
+
+                    saveState();
+                    initActivityDropdowns();
+                    runAutoSubstitution();
+                    alert("✅ Master routine loaded successfully!");
+                } catch (err) {
+                    alert("Error: " + err.message);
+                } finally {
+                    inputEl.value = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // =========================================================================
+        // EQUAL WORKLOAD ALLOCATION ENGINE WITH STRICT 8TH PERIOD BAN (TYPE 3)
+        // =========================================================================
+        function runAutoSubstitution() {
+            const day = document.getElementById('daySelect')?.value || 'Monday';
+            const numPeriods = parseInt(document.getElementById('periodCountSelect')?.value || '8', 10);
+            const maxDailyAllowed = Math.min(numPeriods, 5);
+
+            safeSetText('currentDayBadge', `${day} (${numPeriods}P)`);
+            safeSetText('maxLoadLabel', `Limit: ≤ ${maxDailyAllowed} Periods/Day`);
+
+            let currentSchedule = {};
+            let teacherScheduledMap = {};
+            let teacherPresentScheduledMap = {};
+            let teacherProvisionalMap = {};
+            let teacherPeriodBusy = {};
+            let teacherClassesTaughtToday = {}; 
+
+            let substitutions = [];
+            let jointCount = 0;
+
+            TEACHERS.forEach(t => {
+                teacherScheduledMap[t.id] = 0;
+                teacherPresentScheduledMap[t.id] = 0;
+                teacherProvisionalMap[t.id] = 0;
+                teacherPeriodBusy[t.id] = {};
+                teacherClassesTaughtToday[t.id] = new Set();
+                for (let p = 1; p <= numPeriods; p++) {
+                    teacherPeriodBusy[t.id][`P${p}`] = !!(teacherDutySlots && teacherDutySlots[`${day}_P${p}_${t.id}`]);
+                }
+            });
+
+            // Count scheduled
+            for (let p = 1; p <= numPeriods; p++) {
+                const pKey = `P${p}`;
+                const countedTeachers = new Set();
+                CLASSES.forEach(cls => {
+                    if (suspendedSlots && suspendedSlots[`${day}_${pKey}_${cls}`]) return;
+                    const slot = masterSchedule[day]?.[cls]?.[pKey];
+                    if (slot && teacherScheduledMap[slot.tid] !== undefined) {
+                        if (!countedTeachers.has(slot.tid)) {
+                            teacherScheduledMap[slot.tid]++;
+                            countedTeachers.add(slot.tid);
+                        }
+                    }
+                });
+            }
+
+            // Step 1: Base assignments
+            for (let p = 1; p <= numPeriods; p++) {
+                const pKey = `P${p}`;
+                const countedPresent = new Set();
+
+                CLASSES.forEach(cls => {
+                    if (!currentSchedule[cls]) currentSchedule[cls] = {};
+                    if (suspendedSlots && suspendedSlots[`${day}_${pKey}_${cls}`]) {
+                        currentSchedule[cls][pKey] = { isSuspended: true, isSub: false };
+                        return;
+                    }
+
+                    const slot = masterSchedule[day]?.[cls]?.[pKey];
+                    if (!slot) return;
+
+                    const origTeacher = TEACHERS.find(t => t.id === slot.tid);
+                    const isOnDuty = !!(teacherDutySlots && teacherDutySlots[`${day}_${pKey}_${slot.tid}`]);
+
+                    if (origTeacher && origTeacher.isPresent && !isOnDuty) {
+                        currentSchedule[cls][pKey] = {
+                            subject: slot.subject,
+                            tid: origTeacher.id,
+                            tname: origTeacher.name,
+                            type: origTeacher.type,
+                            isJoint: !!slot.isJoint,
+                            isSub: false
+                        };
+                        if (!countedPresent.has(origTeacher.id)) {
+                            teacherPresentScheduledMap[origTeacher.id]++;
+                            countedPresent.add(origTeacher.id);
+                        }
+                        teacherPeriodBusy[origTeacher.id][pKey] = true;
+                        
+                        teacherClassesTaughtToday[origTeacher.id].add(cls);
+                        if (slot.isJoint) {
+                            const gradePfx = cls.startsWith('XI') ? 'XI' : 'XII';
+                            teacherClassesTaughtToday[origTeacher.id].add(`${gradePfx}-SC`);
+                            teacherClassesTaughtToday[origTeacher.id].add(`${gradePfx}-ARTS`);
+                        }
+                    } else {
+                        currentSchedule[cls][pKey] = {
+                            subject: slot.subject,
+                            origTid: slot.tid,
+                            origTname: origTeacher ? origTeacher.name : slot.tid,
+                            isJoint: !!slot.isJoint,
+                            isSub: true,
+                            unassigned: true
+                        };
+                    }
+                });
+            }
+
+            // Step 2: Allocate Substitutes (With Strict Anti-Duplicate & 8th Period V-VIII Ban)
+            for (let p = 1; p <= numPeriods; p++) {
+                const pKey = `P${p}`;
+                const jointAssigned = {};
+
+                CLASSES.forEach(cls => {
+                    const slot = currentSchedule[cls]?.[pKey];
+                    if (!slot || !slot.isSub || !slot.unassigned) return;
+
+                    const targetGrade = getGradeNumber(cls);
+                    const isHSJoint = (targetGrade >= 11 && isHSCommonSubject(slot.subject));
+                    const jointKey = `${targetGrade}_${normalizeSubj(slot.subject)}`;
+                    const gradePrefix = cls.startsWith('XI') ? 'XI' : (cls.startsWith('XII') ? 'XII' : cls);
+                    const manualTid = manualOverrides[`${day}_${pKey}_${cls}`] || (isHSJoint ? manualOverrides[`${day}_${pKey}_${gradePrefix}-JOINT`] : null);
+
+                    let bestCandidate = null;
+                    let isManual = false;
+
+                    if (manualTid) {
+                        bestCandidate = TEACHERS.find(t => t.id === manualTid);
+                        isManual = true;
+                    } else if (isHSJoint && jointAssigned[jointKey]) {
+                        bestCandidate = jointAssigned[jointKey];
+                    }
+
+                    if (!bestCandidate) {
+                        for (let allowRepeatClass = 0; allowRepeatClass <= 1; allowRepeatClass++) {
+                            let minLoad = 999;
+
+                            TEACHERS.filter(t => t.isPresent && !teacherPeriodBusy[t.id][pKey]).forEach(cand => {
+                                // Type 3 (V-VIII) teachers never get 8th period
+                                if (pKey === 'P8' && cand.type === 'Type 3') return;
+
+                                const load = (teacherPresentScheduledMap[cand.id] || 0) + (teacherProvisionalMap[cand.id] || 0);
+                                if (load >= maxDailyAllowed) return;
+                                if (!isTeacherEligibleForGrade(cand.type, targetGrade)) return;
+
+                                // Prevent 2 classes in same class
+                                const alreadyTaughtThisClass = teacherClassesTaughtToday[cand.id] && (
+                                    teacherClassesTaughtToday[cand.id].has(cls) || 
+                                    (isHSJoint && (teacherClassesTaughtToday[cand.id].has(`${gradePrefix}-SC`) || teacherClassesTaughtToday[cand.id].has(`${gradePrefix}-ARTS`)))
+                                );
+
+                                if (alreadyTaughtThisClass && allowRepeatClass === 0) return;
+
+                                if (load < minLoad) {
+                                    minLoad = load;
+                                    bestCandidate = cand;
+                                }
+                            });
+
+                            if (bestCandidate) break;
+                        }
+                    }
+
+                    if (bestCandidate) {
+                        slot.tid = bestCandidate.id;
+                        slot.tname = bestCandidate.name;
+                        slot.type = bestCandidate.type;
+                        slot.isManual = isManual;
+                        slot.unassigned = false;
+
+                        teacherClassesTaughtToday[bestCandidate.id].add(cls);
+
+                        if (isHSJoint) {
+                            teacherClassesTaughtToday[bestCandidate.id].add(`${gradePrefix}-SC`);
+                            teacherClassesTaughtToday[bestCandidate.id].add(`${gradePrefix}-ARTS`);
+
+                            if (!jointAssigned[jointKey]) {
+                                teacherProvisionalMap[bestCandidate.id] = (teacherProvisionalMap[bestCandidate.id] || 0) + 1;
+                                jointAssigned[jointKey] = bestCandidate;
+                                jointCount++;
+                                substitutions.push({
+                                    period: pKey,
+                                    class: cls.startsWith('XI') ? 'XI (SC+ARTS)' : 'XII (SC+ARTS)',
+                                    rawClass: cls.startsWith('XI') ? 'XI-JOINT' : 'XII-JOINT',
+                                    subject: slot.subject,
+                                    absentTeacher: slot.origTname,
+                                    subTeacherId: bestCandidate.id,
+                                    subTeacher: bestCandidate.name,
+                                    subType: bestCandidate.type,
+                                    isJoint: true,
+                                    isManual
+                                });
+                            }
+                        } else {
+                            teacherProvisionalMap[bestCandidate.id] = (teacherProvisionalMap[bestCandidate.id] || 0) + 1;
+                            substitutions.push({
+                                period: pKey,
+                                class: cls,
+                                rawClass: cls,
+                                subject: slot.subject,
+                                absentTeacher: slot.origTname,
+                                subTeacherId: bestCandidate.id,
+                                subTeacher: bestCandidate.name,
+                                subType: bestCandidate.type,
+                                isJoint: false,
+                                isManual
+                            });
+                        }
+                        teacherPeriodBusy[bestCandidate.id][pKey] = true;
+                    }
+                });
+            }
+
+            TEACHERS.forEach(t => {
+                const sched = teacherScheduledMap[t.id] || 0;
+                const prov = teacherProvisionalMap[t.id] || 0;
+                const total = t.isPresent ? ((teacherPresentScheduledMap[t.id] || 0) + prov) : 0;
+                teacherDailyWorkloads[t.id] = {
+                    scheduled: sched,
+                    provisional: prov,
+                    total: total,
+                    isPresent: t.isPresent
+                };
+            });
+
+            latestGeneratedSubstitutions = substitutions;
+            latestGeneratedDailyGrid = currentSchedule;
+
+            renderTeacherList(document.getElementById('teacherSearch')?.value || '');
+            renderSubstitutionTable(substitutions, teacherPeriodBusy);
+            renderWorkloadSummaryTable(maxDailyAllowed); 
+            renderGrid(currentSchedule, numPeriods);
+            renderSuspendedBadges();
+            renderTeacherDutyBadges();
+
+            safeSetText('statSubCount', substitutions.length);
+            safeSetText('statJointCount', jointCount);
+            safeSetText('statAbsentCount', TEACHERS.filter(t => !t.isPresent).length);
+            safeSetText('mobileTeacherCount', TEACHERS.length);
+        }
+
+        function renderTeacherList(filterText = '') {
+            const list = document.getElementById('teacherList');
+            if (!list) return;
+            list.innerHTML = '';
+            const q = String(filterText || '').toLowerCase();
+
+            TEACHERS.filter(t => t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q)).forEach(t => {
+                const div = document.createElement('div');
+                div.className = `p-2 rounded border transition ${t.isPresent ? 'bg-slate-50 border-slate-200' : 'bg-red-50 border-red-200'}`;
+                const wl = teacherDailyWorkloads[t.id] || { total: 0, scheduled: 0, provisional: 0 };
+
+                div.innerHTML = `
+                    <div class="flex items-start justify-between gap-1">
+                        <div>
+                            <div class="font-bold text-slate-800 text-xs">${t.name} <span class="text-[10px] text-slate-400">(${t.id})</span></div>
+                            <div class="text-[10px] text-slate-500">${t.dept} • ${t.type}</div>
+                        </div>
+                        <button onclick="toggleAttendance('${t.id}')" class="px-2 py-0.5 rounded text-[10px] font-bold ${t.isPresent ? 'bg-emerald-100 text-emerald-700' : 'bg-red-600 text-white'}">
+                            ${t.isPresent ? 'P' : 'A'}
+                        </button>
+                    </div>
+                    <div class="mt-1 pt-1 border-t border-slate-200 flex items-center justify-between text-[10px]">
+                        <span class="text-slate-600">Total: <b>${t.isPresent ? wl.total : 0} Class</b></span>
+                        <select onchange="updateTeacherType('${t.id}', this.value)" class="text-[9px] font-semibold rounded px-1 py-0.5 border cursor-pointer">
+                            <option value="Type 4" ${t.type === 'Type 4' ? 'selected' : ''}>T4 (XI-XII)</option>
+                            <option value="Type 1" ${t.type === 'Type 1' ? 'selected' : ''}>T1 (V-XII)</option>
+                            <option value="Type 2" ${t.type === 'Type 2' ? 'selected' : ''}>T2 (V-X)</option>
+                            <option value="Type 3" ${t.type === 'Type 3' ? 'selected' : ''}>T3 (V-VIII)</option>
+                        </select>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+            safeSetText('attendanceSummary', `${TEACHERS.filter(t => t.isPresent).length} Present | ${TEACHERS.filter(t => !t.isPresent).length} Absent`);
+        }
+
+        function renderSubstitutionTable(subs, teacherPeriodBusy) {
+            const tbody = document.getElementById('substitutionTableBody');
+            const noMsg = document.getElementById('noSubstitutionMsg');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (subs.length === 0) {
+                if (noMsg) noMsg.classList.remove('hidden');
+                return;
+            }
+            if (noMsg) noMsg.classList.add('hidden');
+
+            const day = document.getElementById('daySelect')?.value || 'Monday';
+
+            subs.forEach(s => {
+                const tr = document.createElement('tr');
+                tr.className = `hover:bg-slate-50 border-b border-slate-100 ${s.isJoint ? 'bg-purple-50/40' : ''}`;
+
+                let optionsHTML = `<option value="__AUTO__">✨ Auto Choice</option>`;
+                TEACHERS.filter(t => t.isPresent).forEach(t => {
+                    if (s.period === 'P8' && t.type === 'Type 3') return;
+
+                    const isSelected = (t.id === s.subTeacherId);
+                    const wl = teacherDailyWorkloads[t.id] || { total: 0 };
+                    const isBusy = teacherPeriodBusy && teacherPeriodBusy[t.id] && teacherPeriodBusy[t.id][s.period] && !isSelected;
+                    optionsHTML += `<option value="${t.id}" ${isSelected ? 'selected' : ''}>${t.name} (${t.id}) [${wl.total} Cls]${isBusy ? ' [Busy]' : ''}</option>`;
+                });
+
+                tr.innerHTML = `
+                    <td class="py-2 px-2.5 font-bold text-indigo-900">${s.period}</td>
+                    <td class="py-2 px-2.5 font-semibold">${s.class}</td>
+                    <td class="py-2 px-2.5 font-bold">${s.subject}</td>
+                    <td class="py-2 px-2.5 text-red-600 font-medium">${s.absentTeacher}</td>
+                    <td class="py-2 px-2.5">
+                        <select onchange="handleManualSubChange('${day}', '${s.period}', '${s.rawClass || s.class}', this.value)" class="w-full bg-white border border-slate-300 rounded px-1.5 py-1 text-xs">
+                            ${optionsHTML}
+                        </select>
+                    </td>
+                    <td class="py-2 px-2.5"><span class="px-1 py-0.5 rounded text-[9px] bg-purple-100 text-purple-800">${s.subType}</span></td>
+                    <td class="py-2 px-2.5 text-center">${s.isJoint ? '👥 Joint' : 'Normal'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderWorkloadSummaryTable(maxLimit) {
+            const tbody = document.getElementById('workloadSummaryTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            const day = document.getElementById('daySelect')?.value || 'Monday';
+
+            TEACHERS.forEach(t => {
+                const wl = teacherDailyWorkloads[t.id] || { scheduled: 0, provisional: 0, total: 0, isPresent: t.isPresent };
+                const tr = document.createElement('tr');
+                tr.className = `hover:bg-slate-50 border-b border-slate-100 ${!t.isPresent ? 'bg-red-50/40 text-slate-400' : ''}`;
+
+                let totalBadge = `<span class="font-bold">${wl.total}</span>/${maxLimit}`;
+                if (wl.total >= maxLimit) totalBadge = `<span class="bg-rose-600 text-white font-bold px-1 rounded text-[9px]">${maxLimit} MAX</span>`;
+
+                const dutiesToday = Object.values(teacherDutySlots || {}).filter(v => v && v.day === day && v.tid === t.id);
+                let statusBadge = t.isPresent ? `<span class="text-emerald-700 font-bold">Present</span>` : `<span class="text-red-500 font-bold">Absent</span>`;
+                if (t.isPresent && dutiesToday.length > 0) statusBadge += ` <span class="text-blue-700 text-[9px]">(Duty)</span>`;
+
+                tr.innerHTML = `
+                    <td class="py-1 px-2 font-bold text-slate-700">${t.id}</td>
+                    <td class="py-1 px-2 font-semibold ${t.isPresent ? 'text-slate-800' : 'line-through text-red-500'}">${t.name}</td>
+                    <td class="py-1 px-2 text-center">${wl.scheduled}</td>
+                    <td class="py-1 px-2 text-center font-bold text-amber-600">+${wl.provisional}</td>
+                    <td class="py-1 px-2 text-center">${t.isPresent ? totalBadge : '0'}</td>
+                    <td class="py-1 px-2 text-center">${statusBadge}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderGrid(schedule, numPeriods) {
+            const thead = document.getElementById('gridHeader');
+            const tbody = document.getElementById('gridBody');
+            let h = `<tr><th class="py-1 px-2 border bg-slate-200">Class</th>`;
+            for (let p = 1; p <= numPeriods; p++) h += `<th class="py-1 px-2 border">P${p}</th>`;
+            thead.innerHTML = h + `</tr>`;
+
+            tbody.innerHTML = '';
+            CLASSES.forEach(cls => {
+                const tr = document.createElement('tr');
+                let row = `<td class="p-1 font-bold bg-slate-100 border">${cls}</td>`;
+                for (let p = 1; p <= numPeriods; p++) {
+                    const slot = schedule[cls]?.[`P${p}`];
+                    if (!slot) row += `<td class="p-1 border text-slate-300">-</td>`;
+                    else if (slot.isSub) row += `<td class="p-1 border border-rose-300 bg-rose-50 text-rose-800 font-bold">${slot.tname}<br><span class="text-[9px] text-rose-600">(${slot.subject})</span></td>`;
+                    else row += `<td class="p-1 border">${slot.tname}<br><span class="text-[9px] text-slate-500">(${slot.subject})</span></td>`;
+                }
+                tr.innerHTML = row;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function handleManualSubChange(day, period, cls, selectedTeacherId) {
+            if (cls.includes('JOINT')) {
+                const grade = cls.startsWith('XI') ? 'XI' : 'XII';
+                if (selectedTeacherId === "__AUTO__") {
+                    delete manualOverrides[`${day}_${period}_${grade}-JOINT`];
+                    delete manualOverrides[`${day}_${period}_${grade}-SC`];
+                    delete manualOverrides[`${day}_${period}_${grade}-ARTS`];
+                } else {
+                    manualOverrides[`${day}_${period}_${grade}-JOINT`] = selectedTeacherId;
+                    manualOverrides[`${day}_${period}_${grade}-SC`] = selectedTeacherId;
+                    manualOverrides[`${day}_${period}_${grade}-ARTS`] = selectedTeacherId;
+                }
+            } else {
+                if (selectedTeacherId === "__AUTO__") delete manualOverrides[`${day}_${period}_${cls}`];
+                else manualOverrides[`${day}_${period}_${cls}`] = selectedTeacherId;
+            }
+            saveState();
+            runAutoSubstitution();
+        }
+
+        function updateTeacherType(tid, newType) {
+            const t = TEACHERS.find(x => x.id === tid);
+            if (t) {
+                t.type = newType;
+                saveState();
+                runAutoSubstitution();
+            }
+        }
+
+        function toggleAttendance(tid) {
+            const t = TEACHERS.find(x => x.id === tid);
+            if (t) {
+                t.isPresent = !t.isPresent;
+                saveState();
+                renderTeacherList(document.getElementById('teacherSearch')?.value || '');
+                runAutoSubstitution();
+            }
+        }
+
+        function markAll(present) {
+            TEACHERS.forEach(t => t.isPresent = present);
+            saveState();
+            renderTeacherList();
+            runAutoSubstitution();
+        }
+
+        async function publishAndShareCleanLink() {
+            const day = document.getElementById('daySelect')?.value || 'Monday';
+            const numPeriods = parseInt(document.getElementById('periodCountSelect')?.value || '8', 10);
+
+            const payload = {
+                day: day,
+                periods: numPeriods,
+                updatedAt: new Date().toLocaleTimeString(),
+                teachers: {}
+            };
+
+            TEACHERS.forEach(t => {
+                payload.teachers[t.id] = {
+                    name: t.name,
+                    dept: t.dept,
+                    classes: {}
+                };
+
+                for (let p = 1; p <= numPeriods; p++) {
+                    const pKey = `P${p}`;
+                    CLASSES.forEach(cls => {
+                        const slot = latestGeneratedDailyGrid[cls]?.[pKey];
+                        if (slot && slot.tid === t.id && !slot.unassigned) {
+                            payload.teachers[t.id].classes[pKey] = {
+                                c: slot.isJoint ? `${cls.split('-')[0]} Joint` : cls,
+                                s: slot.subject,
+                                sub: !!slot.isSub,
+                                f: slot.isSub ? (slot.origTname || 'Absent') : ''
+                            };
+                        }
+                    });
+                }
+            });
+
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}todayRoutine.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    let baseUrl = window.location.href.split('?')[0].split('#')[0];
+                    baseUrl = baseUrl.replace('index.html', 'teacher.html');
+                    if (!baseUrl.endsWith('teacher.html')) baseUrl += 'teacher.html';
+
+                    const msg = `*📢 FULIA VIDYAMANDIR Daily Routine (${day} - ${numPeriods} Periods)*\n\nRespected Teachers, today's schedule has been published. Please open the link and select your name to check your classes:\n\n🔗 ${baseUrl}\n\n_Software created by Prasenjit Nath (9735296618)_`;
+                    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+                } else {
+                    alert("Could not upload to cloud. Please check Firebase rules.");
+                }
+            } catch(e) {
+                alert("Cloud Sync Error: " + e.message);
+            }
+        }
+
+        function exportDailyExcel() {
+            const day = document.getElementById('daySelect')?.value || 'Monday';
+            const numPeriods = parseInt(document.getElementById('periodCountSelect')?.value || '8', 10);
+            const wb = XLSX.utils.book_new();
+
+            const borderThin = {
+                top: { style: "thin", color: { rgb: "D1D5DB" } },
+                bottom: { style: "thin", color: { rgb: "D1D5DB" } },
+                left: { style: "thin", color: { rgb: "D1D5DB" } },
+                right: { style: "thin", color: { rgb: "D1D5DB" } }
+            };
+
+            const styleHeader = {
+                font: { bold: true, color: { rgb: "FFFFFF" }, sz: 10, name: "Arial" },
+                fill: { fgColor: { rgb: "1E293B" } },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: borderThin
+            };
+
+            const styleRegular = {
+                font: { color: { rgb: "1E293B" }, sz: 9, name: "Arial" },
+                alignment: { horizontal: "center", vertical: "center", wrapText: true },
+                border: borderThin
+            };
+
+            const styleProvisionalRed = {
+                font: { bold: true, color: { rgb: "DC2626" }, sz: 9, name: "Arial" },
+                fill: { fgColor: { rgb: "FEE2E2" } },
+                alignment: { horizontal: "center", vertical: "center", wrapText: true },
+                border: {
+                    top: { style: "medium", color: { rgb: "DC2626" } },
+                    bottom: { style: "medium", color: { rgb: "DC2626" } },
+                    left: { style: "medium", color: { rgb: "DC2626" } },
+                    right: { style: "medium", color: { rgb: "DC2626" } }
+                }
+            };
+
+            const timetableHeader = ["Class"];
+            for (let p = 1; p <= numPeriods; p++) timetableHeader.push(`Period ${p}`);
+            const timetableData = [timetableHeader];
+            const isSubCellMap = {};
+
+            CLASSES.forEach((cls, rIdx) => {
+                const row = [cls];
+                for (let p = 1; p <= numPeriods; p++) {
+                    const slot = latestGeneratedDailyGrid[cls]?.[`P${p}`];
+                    if (!slot) row.push("-");
+                    else if (slot.isSub) {
+                        row.push(`${slot.tname}\n(${slot.subject}) [SUB]`);
+                        isSubCellMap[`${rIdx + 1}_${p}`] = true;
+                    } else {
+                        row.push(`${slot.tname}\n(${slot.subject})`);
+                    }
+                }
+                timetableData.push(row);
+            });
+
+            const wsTimetable = XLSX.utils.aoa_to_sheet(timetableData);
+            for (let r = 0; r < timetableData.length; r++) {
+                for (let c = 0; c <= numPeriods; c++) {
+                    const ref = XLSX.utils.encode_cell({ r, c });
+                    if (!wsTimetable[ref]) continue;
+                    if (r === 0) wsTimetable[ref].s = styleHeader;
+                    else if (isSubCellMap[`${r}_${c}`]) wsTimetable[ref].s = styleProvisionalRed;
+                    else wsTimetable[ref].s = styleRegular;
+                }
+            }
+            XLSX.utils.book_append_sheet(wb, wsTimetable, "Daily_Timetable");
+            XLSX.writeFile(wb, `Daily_Routine_${day}.xlsx`);
+        }
+
+        document.getElementById('teacherSearch')?.addEventListener('input', (e) => renderTeacherList(e.target.value));
+        document.getElementById('daySelect')?.addEventListener('change', () => {
+            initActivityDropdowns();
+            renderSuspendedBadges();
+            renderTeacherDutyBadges();
+            runAutoSubstitution();
+        });
+
+        document.getElementById('periodCountSelect')?.addEventListener('change', () => {
+            initActivityDropdowns();
+            runAutoSubstitution();
+        });
+
+        window.onload = () => {
+            if (checkSoftwareLicense()) {
+                initActivityDropdowns();
+                renderSuspendedBadges();
+                renderTeacherDutyBadges();
+                runAutoSubstitution();
+            }
+        };
+    </script>
+</body>
+</html>
