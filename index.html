@@ -502,14 +502,14 @@
         }
 
         // =========================================================================
-        // ROBUST CLASS EXTRACTOR: PREVENTS EXTRA ROWS FOR V-A, VI-B, IX-A ETC.
+        // STRICT CLASS & SUBJECT EXTRACTOR (PREVENTS ISOLATED "V" OR "X" ROWS)
         // =========================================================================
         function extractCleanClassAndSubject(rawCell) {
             if (!rawCell) return [null, null];
             let val = String(rawCell).trim().replace(/\n/g, ' ');
             if (!val || val === '-' || val.startsWith('=')) return [null, null];
 
-            // Normalize spaces and common formats
+            // Normalize spaces
             val = val.replace(/VI-\s*C/gi, 'VI-C').replace(/VI-\s*A/gi, 'VI-A').replace(/VI-\s*B/gi, 'VI-B')
                      .replace(/VII-\s*A/gi, 'VII-A').replace(/VII-\s*B/gi, 'VII-B')
                      .replace(/VIII-\s*A/gi, 'VIII-A').replace(/VIII-\s*B/gi, 'VIII-B')
@@ -517,16 +517,27 @@
                      .replace(/V-\s*C/gi, 'V-C').replace(/V-\s*D/gi, 'V-D')
                      .replace(/IX-\s*A/gi, 'IX-A').replace(/X-\s*A/gi, 'X-A');
 
-            // Match Standard Classes like V-A, VI-B, VII-A, IX-A, XI-SC, XII-ARTS etc.
-            const match = val.match(/^(V|VI|VII|VIII|IX|X|XI|XII)(-[A-D]|-SC|-ARTS)?/i);
-            if (match) {
-                let mainClass = match[0].toUpperCase();
-                let remaining = val.substring(match[0].length).replace(/^[\.\s\-_]+/, '').trim();
-                return [mainClass, remaining || 'General'];
+            // 1. High Secondary Classes: Match XII and XI first (So they NEVER become "X")
+            const hsMatch = val.match(/^(XII|XI)(-[A-Za-z]+)?/i);
+            if (hsMatch) {
+                let grade = hsMatch[1].toUpperCase();
+                let rem = val.substring(hsMatch[0].length).replace(/^[\.\s\-_]+/, '').trim();
+                let fullUpper = val.toUpperCase();
+                let sec = fullUpper.includes('ARTS') ? 'ARTS' : (fullUpper.includes('SC') ? 'SC' : '');
+                let clsName = sec ? `${grade}-${sec}` : grade;
+                return [clsName, rem || 'General'];
             }
 
-            const parts = val.split(' ');
-            return [parts[0].replace(/\.$/, '').toUpperCase(), parts.slice(1).join(' ') || 'General'];
+            // 2. High School & Junior Classes: Must have Section (V-A, VI-B, VII-A, VIII-B, IX-A, X-A)
+            const secMatch = val.match(/^(V|VI|VII|VIII|IX|X)-([A-D])/i);
+            if (secMatch) {
+                let clsName = `${secMatch[1].toUpperCase()}-${secMatch[2].toUpperCase()}`;
+                let rem = val.substring(secMatch[0].length).replace(/^[\.\s\-_]+/, '').trim();
+                return [clsName, rem || 'General'];
+            }
+
+            // 3. Reject bare "V" or "X" without valid section
+            return [null, null];
         }
 
         function sortClassesList(arr) {
@@ -675,7 +686,7 @@
         }
 
         // =========================================================================
-        // ROBUST EXCEL UPLOADER (MERGES CLEANLY BY CLASS)
+        // ROBUST EXCEL UPLOADER: ACCURATE CLASS MAPPING
         // =========================================================================
         function handleExcelUpload(event) {
             const inputEl = event.target;
@@ -779,7 +790,7 @@
                     saveState();
                     initActivityDropdowns();
                     runAutoSubstitution();
-                    alert("✅ Master routine loaded cleanly without duplicate rows!");
+                    alert("✅ Master routine loaded cleanly! All duplicate/isolated rows removed.");
                 } catch (err) {
                     alert("Error: " + err.message);
                 } finally {
