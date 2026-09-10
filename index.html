@@ -85,9 +85,11 @@
                         <option value="8">8 Periods</option>
                         <option value="7">7 Periods</option>
                         <option value="6">6 Periods</option>
-                        <option value="5">5 Periods (Early Close)</option>
+                        <option value="5">5 Periods</option>
                         <option value="4">4 Periods (Half Day / Sat)</option>
                         <option value="3">3 Periods</option>
+                        <option value="2">2 Periods</option>
+                        <option value="1">1 Period</option>
                     </select>
                 </div>
 
@@ -495,7 +497,7 @@
         }
 
         // =========================================================================
-        // PARSER WITH CLEAN SUBJECT EXTRACTOR (REMOVES -SC, -ARTS, ETC.)
+        // SAFE PARSER: PRESERVES WORDS LIKE "SCIENCE" WITHOUT TRUNCATING TO "IENCE"
         // =========================================================================
         function parseCellClassAndSubject(rawCell) {
             if (!rawCell) return null;
@@ -514,8 +516,8 @@
                 const isArts = /ARTS|POL|HIST|GEO|SANS|PHIL|EDU/i.test(val);
                 targetClass = isArts ? 'XII-ARTS' : 'XII-SC';
                 subject = val.replace(/^(XII|II\b|II-ARTS|II-SC|XII-ARTS|XII-SC|XII-|II-|I-A|I-B|I-C)\s*/i, '').trim() || 'General';
-                // Clean up leading prefixes like -SC, -ARTS, SC, ARTS from subject name
-                subject = subject.replace(/^[\-\.\s]*(SC|ARTS)?[\-\.\s]*/i, '').trim();
+                // Only strip hyphenated or standalone prefix like "-SC", "-ARTS" without affecting words like "science"
+                subject = subject.replace(/^[\-\.]\s*(SC|ARTS)\b/i, '').trim();
                 return { targetClass, subject, isHS: true, grade: 'XII' };
             }
 
@@ -523,7 +525,7 @@
                 const isArts = /ARTS|POL|HIST|GEO|SANS|PHIL|EDU/i.test(val);
                 targetClass = isArts ? 'XI-ARTS' : 'XI-SC';
                 subject = val.replace(/^(XI|I\b|I-ARTS|I-SC|XI-ARTS|XI-SC|XI-|I-|I-A|I-B|I-C)\s*/i, '').trim() || 'General';
-                subject = subject.replace(/^[\-\.\s]*(SC|ARTS)?[\-\.\s]*/i, '').trim();
+                subject = subject.replace(/^[\-\.]\s*(SC|ARTS)\b/i, '').trim();
                 return { targetClass, subject, isHS: true, grade: 'XI' };
             }
 
@@ -531,7 +533,7 @@
                 const sec = val.match(/^III\s*-\s*([AB])/i)[1].toUpperCase();
                 targetClass = `VIII-${sec}`;
                 subject = val.replace(/^III\s*-\s*[AB]\s*/i, '').trim() || 'General';
-                subject = subject.replace(/^[\-\.\s]*(SC|ARTS)?[\-\.\s]*/i, '').trim();
+                subject = subject.replace(/^[\-\.]\s*(SC|ARTS)\b/i, '').trim();
                 return { targetClass, subject, isHS: false, grade: 'VIII' };
             }
 
@@ -539,7 +541,7 @@
             if (stdMatch) {
                 targetClass = `${stdMatch[1].toUpperCase()}-${stdMatch[2].toUpperCase()}`;
                 subject = val.substring(stdMatch[0].length).replace(/^[\.\s\-_]+/, '').trim() || 'General';
-                subject = subject.replace(/^[\-\.\s]*(SC|ARTS)?[\-\.\s]*/i, '').trim();
+                subject = subject.replace(/^[\-\.]\s*(SC|ARTS)\b/i, '').trim();
                 return { targetClass, subject, isHS: false, grade: stdMatch[1].toUpperCase() };
             }
 
@@ -682,9 +684,6 @@
             });
         }
 
-        // =========================================================================
-        // ROBUST BLOCK-BASED DAY & PERIOD MAPPER FOR ALL DAYS INCLUDING SATURDAY
-        // =========================================================================
         function handleExcelUpload(event) {
             const inputEl = event.target;
             const file = inputEl.files && inputEl.files[0];
@@ -701,7 +700,6 @@
                     const row0 = rawRows[0] || [];
                     const dayColMap = {};
 
-                    // Block-based scanner: find each day header in row0 and assign its contiguous columns
                     for (let cIdx = 0; cIdx < row0.length; cIdx++) {
                         const cell0Str = String(row0[cIdx] || '').trim().toUpperCase();
                         for (let d of DAYS) {
@@ -1333,8 +1331,6 @@
             const periodSelect = document.getElementById('periodCountSelect');
             if (selectedDay === 'Saturday') {
                 periodSelect.value = '4';
-            } else {
-                periodSelect.value = '8';
             }
             initActivityDropdowns();
             renderSuspendedBadges();
@@ -1353,8 +1349,6 @@
                 const periodSelect = document.getElementById('periodCountSelect');
                 if (daySelect && daySelect.value === 'Saturday') {
                     periodSelect.value = '4';
-                } else {
-                    periodSelect.value = '8';
                 }
                 initActivityDropdowns();
                 renderSuspendedBadges();
