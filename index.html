@@ -370,6 +370,16 @@
             'WORK_VOC_ACTIVITY': ['WEDU', 'WED', 'WORKED', 'PEDU', 'PEDUCATION', 'COM', 'COMPUTER', 'LIB', 'LIBRARY', 'PLBV', 'BWLV']
         };
 
+        const STANDARD_CLASSES = [
+            'V-A', 'V-B', 'V-C', 'V-D',
+            'VI-A', 'VI-B', 'VI-C',
+            'VII-A', 'VII-B',
+            'VIII-A', 'VIII-B',
+            'IX-A', 'X-A',
+            'XI-SC', 'XI-ARTS',
+            'XII-SC', 'XII-ARTS'
+        ];
+
         function safeSetText(elementId, text) {
             const el = document.getElementById(elementId);
             if (el) el.innerText = text;
@@ -383,14 +393,6 @@
             return HS_COMMON_LANGUAGES.includes(normalizeSubj(subj));
         }
 
-        function isHSScienceSubject(subj) {
-            return HS_SCIENCE_SUBJECTS.includes(normalizeSubj(subj));
-        }
-
-        function isHSArtsSubject(subj) {
-            return HS_ARTS_SUBJECTS.includes(normalizeSubj(subj));
-        }
-
         function getSubjectStream(subjectName) {
             const norm = normalizeSubj(subjectName);
             if (!norm) return 'GENERAL';
@@ -400,15 +402,6 @@
             return 'GENERAL';
         }
 
-        function getStreamDisplayName(streamKey) {
-            switch(streamKey) {
-                case 'SCIENCE_MATH': return '🔬 Science';
-                case 'LANGUAGES': return '📖 Language';
-                case 'HUMANITIES': return '🏛️ Arts';
-                default: return '🎨 Activity';
-            }
-        }
-
         function loadStorage(key, fallback) {
             try {
                 const raw = localStorage.getItem(key);
@@ -416,7 +409,7 @@
             } catch(e) { return fallback; }
         }
 
-        let CLASSES = loadStorage('hs_classes_joint_v2', ['V-A', 'V-B', 'VI-A', 'VII-A', 'VIII-A', 'IX-A', 'X-A', 'XI-SC', 'XI-ARTS', 'XII-SC', 'XII-ARTS']);
+        let CLASSES = loadStorage('hs_classes_joint_v2', STANDARD_CLASSES);
         let TEACHERS = loadStorage('hs_teachers_joint_v2', []);
         let masterSchedule = loadStorage('hs_master_schedule_joint_v2', {});
         let manualOverrides = loadStorage('hs_manual_overrides_joint_v2', {});
@@ -501,54 +494,48 @@
             return true;
         }
 
-        // =========================================================================
-        // COMPREHENSIVE CLASS NORMALIZER (HANDLES I, II, III, XI, XII & SECTIONS)
-        // =========================================================================
-        function extractCleanClassAndSubject(rawCell) {
-            if (!rawCell) return [null, null];
+        function parseCellClassAndSubject(rawCell) {
+            if (!rawCell) return null;
             let val = String(rawCell).trim().replace(/\n/g, ' ');
-            if (!val || val === '-' || val.startsWith('=')) return [null, null];
+            if (!val || val === '-' || val.startsWith('=')) return null;
 
-            // Replace common school notations (I = XI, II = XII, III = VIII)
-            val = val.replace(/^I\s*-\s*ARTS/i, 'XI-ARTS')
-                     .replace(/^I\s*-\s*SC/i, 'XI-SC')
-                     .replace(/^I\s+/i, 'XI ')
-                     .replace(/^II\s*-\s*ARTS/i, 'XII-ARTS')
-                     .replace(/^II\s*-\s*SC/i, 'XII-SC')
-                     .replace(/^II\s*-\s*([A-D])/i, 'XII-$1')
-                     .replace(/^II\s+/i, 'XII ')
-                     .replace(/^III\s*-\s*([A-D])/i, 'VIII-$1')
-                     .replace(/^I\s*-\s*([A-D])/i, 'XI-$1');
+            val = val.replace(/^V-A\./i, 'V-A ')
+                     .replace(/^V-B\./i, 'V-B ')
+                     .replace(/^V-C\./i, 'V-C ')
+                     .replace(/^V-D\./i, 'V-D ');
 
-            // Normalize spaces and dashes
-            val = val.replace(/VI-\s*C/gi, 'VI-C').replace(/VI-\s*A/gi, 'VI-A').replace(/VI-\s*B/gi, 'VI-B')
-                     .replace(/VII-\s*A/gi, 'VII-A').replace(/VII-\s*B/gi, 'VII-B')
-                     .replace(/VIII-\s*A/gi, 'VIII-A').replace(/VIII-\s*B/gi, 'VIII-B')
-                     .replace(/V-\s*A/gi, 'V-A').replace(/V-\s*B/gi, 'V-B')
-                     .replace(/V-\s*C/gi, 'V-C').replace(/V-\s*D/gi, 'V-D')
-                     .replace(/IX-\s*A/gi, 'IX-A').replace(/X-\s*A/gi, 'X-A');
+            let targetClass = null;
+            let subject = 'General';
 
-            // 1. Match HS: XII and XI
-            const hsMatch = val.match(/^(XII|XI)(-[A-Za-z]+)?/i);
-            if (hsMatch) {
-                let grade = hsMatch[1].toUpperCase();
-                let rem = val.substring(hsMatch[0].length).replace(/^[\.\s\-_]+/, '').trim();
-                let fullUpper = val.toUpperCase();
-                let sec = fullUpper.includes('ARTS') ? 'ARTS' : (fullUpper.includes('SC') ? 'SC' : '');
-                let clsName = sec ? `${grade}-${sec}` : grade;
-                return [clsName, rem || 'General'];
+            if (/^(XI|I\b|I-)/i.test(val)) {
+                const isArts = /ARTS|POL|HIST|GEO|SANS|PHIL|EDU/i.test(val);
+                targetClass = isArts ? 'XI-ARTS' : 'XI-SC';
+                subject = val.replace(/^(XI|I\b|I-ARTS|I-SC|I-A|I-B|I-C)\s*/i, '').trim() || 'General';
+                return { targetClass, subject, isHS: true, grade: 'XI' };
             }
 
-            // 2. Match standard sections (V-A to X-D)
-            const secMatch = val.match(/^(V|VI|VII|VIII|IX|X)-([A-D])/i);
-            if (secMatch) {
-                let clsName = `${secMatch[1].toUpperCase()}-${secMatch[2].toUpperCase()}`;
-                let rem = val.substring(secMatch[0].length).replace(/^[\.\s\-_]+/, '').trim();
-                return [clsName, rem || 'General'];
+            if (/^(XII|II\b|II-)/i.test(val)) {
+                const isArts = /ARTS|POL|HIST|GEO|SANS|PHIL|EDU/i.test(val);
+                targetClass = isArts ? 'XII-ARTS' : 'XII-SC';
+                subject = val.replace(/^(XII|II\b|II-ARTS|II-SC|II-A|II-B|II-C)\s*/i, '').trim() || 'General';
+                return { targetClass, subject, isHS: true, grade: 'XII' };
             }
 
-            // 3. Ignore invalid bare "V" or "X"
-            return [null, null];
+            if (/^III\s*-\s*([AB])/i.test(val)) {
+                const sec = val.match(/^III\s*-\s*([AB])/i)[1].toUpperCase();
+                targetClass = `VIII-${sec}`;
+                subject = val.replace(/^III\s*-\s*[AB]\s*/i, '').trim() || 'General';
+                return { targetClass, subject, isHS: false, grade: 'VIII' };
+            }
+
+            const stdMatch = val.match(/^(V|VI|VII|VIII|IX|X)\s*-\s*([A-D])/i);
+            if (stdMatch) {
+                targetClass = `${stdMatch[1].toUpperCase()}-${stdMatch[2].toUpperCase()}`;
+                subject = val.substring(stdMatch[0].length).replace(/^[\.\s\-_]+/, '').trim() || 'General';
+                return { targetClass, subject, isHS: false, grade: stdMatch[1].toUpperCase() };
+            }
+
+            return null;
         }
 
         function sortClassesList(arr) {
@@ -696,9 +683,6 @@
             });
         }
 
-        // =========================================================================
-        // ROBUST EXCEL UPLOADER
-        // =========================================================================
         function handleExcelUpload(event) {
             const inputEl = event.target;
             const file = inputEl.files && inputEl.files[0];
@@ -732,9 +716,12 @@
                     }
 
                     const parsedTeachers = [];
-                    const classSet = new Set();
+                    const classSet = new Set(STANDARD_CLASSES);
                     const newMasterSched = {};
-                    DAYS.forEach(d => { newMasterSched[d] = {}; });
+                    DAYS.forEach(d => { 
+                        newMasterSched[d] = {}; 
+                        STANDARD_CLASSES.forEach(c => { newMasterSched[d][c] = {}; });
+                    });
 
                     for (let r = 2; r < rawRows.length; r++) {
                         const row = rawRows[r];
@@ -750,33 +737,30 @@
                         Object.keys(dayColMap).forEach(d => {
                             dayColMap[d].forEach(pObj => {
                                 const val = row[pObj.colIdx];
-                                const [rawCls, subj] = extractCleanClassAndSubject(val);
-                                if (!rawCls) return;
+                                const parsed = parseCellClassAndSubject(val);
+                                if (!parsed) return;
 
-                                teacherSubjs.add(subj);
-                                const gNum = getGradeNumber(rawCls);
+                                const { targetClass, subject, isHS, grade } = parsed;
+                                teacherSubjs.add(subject);
+
+                                const gNum = getGradeNumber(grade);
                                 if (gNum < minGrade) minGrade = gNum;
                                 if (gNum > maxGrade) maxGrade = gNum;
 
-                                if (gNum >= 11) {
-                                    const gradeName = (gNum === 11) ? 'XI' : 'XII';
-                                    if (isHSCommonSubject(subj)) {
+                                if (isHS) {
+                                    if (isHSCommonSubject(subject)) {
                                         ['SC', 'ARTS'].forEach(sec => {
-                                            const cName = `${gradeName}-${sec}`;
-                                            classSet.add(cName);
+                                            const cName = `${grade}-${sec}`;
                                             if (!newMasterSched[d][cName]) newMasterSched[d][cName] = {};
-                                            newMasterSched[d][cName][`P${pObj.period}`] = { subject: subj, tid: tshort, tname: tname, isJoint: true };
+                                            newMasterSched[d][cName][`P${pObj.period}`] = { subject, tid: tshort, tname, isJoint: true };
                                         });
                                     } else {
-                                        const cName = `${gradeName}-${rawCls.toUpperCase().includes('ARTS') ? 'ARTS' : 'SC'}`;
-                                        classSet.add(cName);
-                                        if (!newMasterSched[d][cName]) newMasterSched[d][cName] = {};
-                                        newMasterSched[d][cName][`P${pObj.period}`] = { subject: subj, tid: tshort, tname: tname, isJoint: false };
+                                        if (!newMasterSched[d][targetClass]) newMasterSched[d][targetClass] = {};
+                                        newMasterSched[d][targetClass][`P${pObj.period}`] = { subject, tid: tshort, tname, isJoint: false };
                                     }
                                 } else {
-                                    classSet.add(rawCls);
-                                    if (!newMasterSched[d][rawCls]) newMasterSched[d][rawCls] = {};
-                                    newMasterSched[d][rawCls][`P${pObj.period}`] = { subject: subj, tid: tshort, tname: tname, isJoint: false };
+                                    if (!newMasterSched[d][targetClass]) newMasterSched[d][targetClass] = {};
+                                    newMasterSched[d][targetClass][`P${pObj.period}`] = { subject, tid: tshort, tname, isJoint: false };
                                 }
                             });
                         });
@@ -794,14 +778,14 @@
                     }
 
                     TEACHERS = parsedTeachers;
-                    CLASSES = sortClassesList(Array.from(classSet));
+                    CLASSES = STANDARD_CLASSES;
                     masterSchedule = newMasterSched;
                     manualOverrides = {};
 
                     saveState();
                     initActivityDropdowns();
                     runAutoSubstitution();
-                    alert("✅ Master routine loaded cleanly! All 'V' and 'X' extra rows have been resolved.");
+                    alert("✅ Master routine loaded cleanly!");
                 } catch (err) {
                     alert("Error: " + err.message);
                 } finally {
@@ -811,9 +795,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // =========================================================================
-        // AUTO SUBSTITUTION ENGINE
-        // =========================================================================
         function runAutoSubstitution() {
             const day = document.getElementById('daySelect')?.value || 'Monday';
             const numPeriods = parseInt(document.getElementById('periodCountSelect')?.value || '8', 10);
@@ -843,7 +824,6 @@
                 }
             });
 
-            // Count scheduled
             for (let p = 1; p <= numPeriods; p++) {
                 const pKey = `P${p}`;
                 const countedTeachers = new Set();
@@ -859,7 +839,6 @@
                 });
             }
 
-            // Step 1: Base assignments
             for (let p = 1; p <= numPeriods; p++) {
                 const pKey = `P${p}`;
                 const countedPresent = new Set();
@@ -911,7 +890,6 @@
                 });
             }
 
-            // Step 2: Allocate Substitutes
             for (let p = 1; p <= numPeriods; p++) {
                 const pKey = `P${p}`;
                 const jointAssigned = {};
@@ -1303,7 +1281,7 @@
             };
 
             const styleProvisionalRed = {
-                font: { bold: true, color: { rgb: "DC2626" }, sz: 9, name: "Arial" },
+                font: { bold: { bold: true }, color: { rgb: "DC2626" }, sz: 9, name: "Arial" },
                 fill: { fgColor: { rgb: "FEE2E2" } },
                 alignment: { horizontal: "center", vertical: "center", wrapText: true },
                 border: {
@@ -1349,7 +1327,14 @@
         }
 
         document.getElementById('teacherSearch')?.addEventListener('input', (e) => renderTeacherList(e.target.value));
-        document.getElementById('daySelect')?.addEventListener('change', () => {
+        
+        // AUTO SWITCH TO 4 PERIODS ON SATURDAY
+        document.getElementById('daySelect')?.addEventListener('change', (e) => {
+            const selectedDay = e.target.value;
+            const periodSelect = document.getElementById('periodCountSelect');
+            if (selectedDay === 'Saturday') {
+                periodSelect.value = '4';
+            }
             initActivityDropdowns();
             renderSuspendedBadges();
             renderTeacherDutyBadges();
@@ -1363,6 +1348,11 @@
 
         window.onload = () => {
             if (checkSoftwareLicense()) {
+                // If today or default is Saturday, set 4 periods on load
+                const daySelect = document.getElementById('daySelect');
+                if (daySelect && daySelect.value === 'Saturday') {
+                    document.getElementById('periodCountSelect').value = '4';
+                }
                 initActivityDropdowns();
                 renderSuspendedBadges();
                 renderTeacherDutyBadges();
