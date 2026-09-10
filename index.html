@@ -494,6 +494,9 @@
             return true;
         }
 
+        // =========================================================================
+        // PARSER WITH CLEAN SUBJECT EXTRACTOR (REMOVES -SC, -ARTS, ETC.)
+        // =========================================================================
         function parseCellClassAndSubject(rawCell) {
             if (!rawCell) return null;
             let val = String(rawCell).trim().replace(/\n/g, ' ');
@@ -507,24 +510,28 @@
             let targetClass = null;
             let subject = 'General';
 
-            if (/^(XI|I\b|I-)/i.test(val)) {
-                const isArts = /ARTS|POL|HIST|GEO|SANS|PHIL|EDU/i.test(val);
-                targetClass = isArts ? 'XI-ARTS' : 'XI-SC';
-                subject = val.replace(/^(XI|I\b|I-ARTS|I-SC|I-A|I-B|I-C)\s*/i, '').trim() || 'General';
-                return { targetClass, subject, isHS: true, grade: 'XI' };
-            }
-
-            if (/^(XII|II\b|II-)/i.test(val)) {
+            if (/^(XII|II\b|II-|XII-)/i.test(val)) {
                 const isArts = /ARTS|POL|HIST|GEO|SANS|PHIL|EDU/i.test(val);
                 targetClass = isArts ? 'XII-ARTS' : 'XII-SC';
-                subject = val.replace(/^(XII|II\b|II-ARTS|II-SC|II-A|II-B|II-C)\s*/i, '').trim() || 'General';
+                subject = val.replace(/^(XII|II\b|II-ARTS|II-SC|XII-ARTS|XII-SC|XII-|II-|I-A|I-B|I-C)\s*/i, '').trim() || 'General';
+                // Clean up leading prefixes like -SC, -ARTS, SC, ARTS from subject name
+                subject = subject.replace(/^[\-\.\s]*(SC|ARTS)?[\-\.\s]*/i, '').trim();
                 return { targetClass, subject, isHS: true, grade: 'XII' };
+            }
+
+            if (/^(XI|I\b|I-|XI-)/i.test(val)) {
+                const isArts = /ARTS|POL|HIST|GEO|SANS|PHIL|EDU/i.test(val);
+                targetClass = isArts ? 'XI-ARTS' : 'XI-SC';
+                subject = val.replace(/^(XI|I\b|I-ARTS|I-SC|XI-ARTS|XI-SC|XI-|I-|I-A|I-B|I-C)\s*/i, '').trim() || 'General';
+                subject = subject.replace(/^[\-\.\s]*(SC|ARTS)?[\-\.\s]*/i, '').trim();
+                return { targetClass, subject, isHS: true, grade: 'XI' };
             }
 
             if (/^III\s*-\s*([AB])/i.test(val)) {
                 const sec = val.match(/^III\s*-\s*([AB])/i)[1].toUpperCase();
                 targetClass = `VIII-${sec}`;
                 subject = val.replace(/^III\s*-\s*[AB]\s*/i, '').trim() || 'General';
+                subject = subject.replace(/^[\-\.\s]*(SC|ARTS)?[\-\.\s]*/i, '').trim();
                 return { targetClass, subject, isHS: false, grade: 'VIII' };
             }
 
@@ -532,19 +539,11 @@
             if (stdMatch) {
                 targetClass = `${stdMatch[1].toUpperCase()}-${stdMatch[2].toUpperCase()}`;
                 subject = val.substring(stdMatch[0].length).replace(/^[\.\s\-_]+/, '').trim() || 'General';
+                subject = subject.replace(/^[\-\.\s]*(SC|ARTS)?[\-\.\s]*/i, '').trim();
                 return { targetClass, subject, isHS: false, grade: stdMatch[1].toUpperCase() };
             }
 
             return null;
-        }
-
-        function sortClassesList(arr) {
-            return arr.sort((a, b) => {
-                const gA = getGradeNumber(a);
-                const gB = getGradeNumber(b);
-                if (gA !== gB) return gA - gB;
-                return a.localeCompare(b);
-            });
         }
 
         function initActivityDropdowns() {
@@ -684,7 +683,7 @@
         }
 
         // =========================================================================
-        // ROBUST EXCEL UPLOADER: MATCHES BOTH 1-8 AND SATURDAY 1-4 PERIOD NUMBERS
+        // ROBUST BLOCK-BASED DAY & PERIOD MAPPER FOR ALL DAYS INCLUDING SATURDAY
         // =========================================================================
         function handleExcelUpload(event) {
             const inputEl = event.target;
@@ -700,34 +699,24 @@
                     const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
                     const row0 = rawRows[0] || [];
-                    const row1 = rawRows[1] || [];
                     const dayColMap = {};
-                    let currDay = null;
 
+                    // Block-based scanner: find each day header in row0 and assign its contiguous columns
                     for (let cIdx = 0; cIdx < row0.length; cIdx++) {
                         const cell0Str = String(row0[cIdx] || '').trim().toUpperCase();
                         for (let d of DAYS) {
                             if (cell0Str.includes(d.toUpperCase())) {
-                                currDay = d;
-                                if (!dayColMap[currDay]) dayColMap[currDay] = [];
-                                break;
-                            }
-                        }
-                        // Flexible period matcher: handles 1,2,3,4 or 1st, 2nd, etc.
-                        if (currDay && cIdx < row1.length) {
-                            const pValStr = String(row1[cIdx] || '').trim();
-                            const pMatch = pValStr.match(/\d+/);
-                            if (pMatch) {
-                                const pNum = parseInt(pMatch[0], 10);
-                                if (pNum >= 1 && pNum <= 8) {
-                                    dayColMap[currDay].push({ period: pNum, colIdx: cIdx });
+                                dayColMap[d] = [];
+                                const pCount = (d === 'Saturday') ? 4 : 8;
+                                for (let p = 1; p <= pCount; p++) {
+                                    dayColMap[d].push({ period: p, colIdx: cIdx + (p - 1) });
                                 }
+                                break;
                             }
                         }
                     }
 
                     const parsedTeachers = [];
-                    const classSet = new Set(STANDARD_CLASSES);
                     const newMasterSched = {};
                     DAYS.forEach(d => { 
                         newMasterSched[d] = {}; 
@@ -796,7 +785,7 @@
                     saveState();
                     initActivityDropdowns();
                     runAutoSubstitution();
-                    alert("✅ Master routine loaded cleanly for all days including Saturday!");
+                    alert("✅ Master routine loaded cleanly!");
                 } catch (err) {
                     alert("Error: " + err.message);
                 } finally {
@@ -1344,6 +1333,8 @@
             const periodSelect = document.getElementById('periodCountSelect');
             if (selectedDay === 'Saturday') {
                 periodSelect.value = '4';
+            } else {
+                periodSelect.value = '8';
             }
             initActivityDropdowns();
             renderSuspendedBadges();
@@ -1359,8 +1350,11 @@
         window.onload = () => {
             if (checkSoftwareLicense()) {
                 const daySelect = document.getElementById('daySelect');
+                const periodSelect = document.getElementById('periodCountSelect');
                 if (daySelect && daySelect.value === 'Saturday') {
-                    document.getElementById('periodCountSelect').value = '4';
+                    periodSelect.value = '4';
+                } else {
+                    periodSelect.value = '8';
                 }
                 initActivityDropdowns();
                 renderSuspendedBadges();
