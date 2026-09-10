@@ -683,6 +683,9 @@
             });
         }
 
+        // =========================================================================
+        // ROBUST EXCEL UPLOADER: MATCHES BOTH 1-8 AND SATURDAY 1-4 PERIOD NUMBERS
+        // =========================================================================
         function handleExcelUpload(event) {
             const inputEl = event.target;
             const file = inputEl.files && inputEl.files[0];
@@ -710,8 +713,16 @@
                                 break;
                             }
                         }
-                        if (currDay && cIdx < row1.length && /^\d+$/.test(String(row1[cIdx] || '').trim())) {
-                            dayColMap[currDay].push({ period: parseInt(row1[cIdx], 10), colIdx: cIdx });
+                        // Flexible period matcher: handles 1,2,3,4 or 1st, 2nd, etc.
+                        if (currDay && cIdx < row1.length) {
+                            const pValStr = String(row1[cIdx] || '').trim();
+                            const pMatch = pValStr.match(/\d+/);
+                            if (pMatch) {
+                                const pNum = parseInt(pMatch[0], 10);
+                                if (pNum >= 1 && pNum <= 8) {
+                                    dayColMap[currDay].push({ period: pNum, colIdx: cIdx });
+                                }
+                            }
                         }
                     }
 
@@ -785,7 +796,7 @@
                     saveState();
                     initActivityDropdowns();
                     runAutoSubstitution();
-                    alert("✅ Master routine loaded cleanly!");
+                    alert("✅ Master routine loaded cleanly for all days including Saturday!");
                 } catch (err) {
                     alert("Error: " + err.message);
                 } finally {
@@ -1281,7 +1292,7 @@
             };
 
             const styleProvisionalRed = {
-                font: { bold: { bold: true }, color: { rgb: "DC2626" }, sz: 9, name: "Arial" },
+                font: { bold: true, color: { rgb: "DC2626" }, sz: 9, name: "Arial" },
                 fill: { fgColor: { rgb: "FEE2E2" } },
                 alignment: { horizontal: "center", vertical: "center", wrapText: true },
                 border: {
@@ -1328,7 +1339,6 @@
 
         document.getElementById('teacherSearch')?.addEventListener('input', (e) => renderTeacherList(e.target.value));
         
-        // AUTO SWITCH TO 4 PERIODS ON SATURDAY
         document.getElementById('daySelect')?.addEventListener('change', (e) => {
             const selectedDay = e.target.value;
             const periodSelect = document.getElementById('periodCountSelect');
@@ -1348,7 +1358,6 @@
 
         window.onload = () => {
             if (checkSoftwareLicense()) {
-                // If today or default is Saturday, set 4 periods on load
                 const daySelect = document.getElementById('daySelect');
                 if (daySelect && daySelect.value === 'Saturday') {
                     document.getElementById('periodCountSelect').value = '4';
