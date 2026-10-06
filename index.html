@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FULIA VIDYAMANDIR Master Timetable Portal</title>
+    <title>FULIA VIDYAMANDIR & Multi-School Master Portal</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
@@ -26,29 +26,32 @@
 
     <script>
         const FIREBASE_DB_URL = "https://school-routine-prasenjit-default-rtdb.firebaseio.com/";
-        const MASTER_RENEWAL_KEY = "FULIA@2026"; 
     </script>
 
-    <!-- License Expiry Overlay Modal -->
-    <div id="licenseLockModal" class="fixed inset-0 bg-slate-950/90 z-[9999] hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 text-center shadow-2xl border-4 border-rose-500">
-            <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-black">
-                <i class="fa-solid fa-lock"></i>
+    <!-- School Login Modal Overlay -->
+    <div id="schoolLoginModal" class="fixed inset-0 bg-slate-950/95 z-[9999] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border-4 border-indigo-600">
+            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-black">
+                <i class="fa-solid fa-school"></i>
             </div>
-            <h2 class="text-xl font-bold text-slate-800 mb-1">Software License Expired!</h2>
-            <p class="text-xs text-slate-500 mb-4">Your 1-month authorized validity period has ended. Please renew the license from the software developer.</p>
+            <h2 class="text-xl font-bold text-slate-800 text-center mb-1">School Portal Login</h2>
+            <p class="text-xs text-slate-500 text-center mb-5">Enter your 11-digit UDISE Code and Password to access your school routine.</p>
             
-            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-left text-xs mb-4">
-                <div class="font-bold text-slate-700">Developer Contact:</div>
-                <div class="text-indigo-600 font-semibold mt-0.5"><i class="fa-solid fa-user-gear mr-1"></i> Prasenjit Nath</div>
-                <div class="text-slate-600 font-semibold"><i class="fa-solid fa-phone mr-1"></i> 9735296618</div>
-            </div>
-
-            <div class="space-y-2">
-                <input type="password" id="renewalKeyInput" placeholder="Enter Monthly Activation Key" class="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-center focus:outline-none focus:ring-2 focus:ring-rose-500">
-                <button onclick="submitLicenseRenewal()" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded-lg text-xs transition shadow-md">
-                    Activate Next 30 Days
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-600 mb-1 uppercase">UDISE Code (Username):</label>
+                    <input type="text" id="loginUdiseInput" maxlength="11" placeholder="e.g. 19101234567" class="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-600 mb-1 uppercase">Password:</label>
+                    <input type="password" id="loginPasswordInput" placeholder="Enter School Password" class="w-full bg-slate-100 border border-slate-300 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <button onclick="handleSchoolLogin()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition shadow-md mt-2">
+                    <i class="fa-solid fa-right-to-bracket mr-1"></i> Login to Portal
                 </button>
+            </div>
+            <div class="mt-4 pt-4 border-t border-slate-200 text-center">
+                <span class="text-[10px] text-slate-400">Software created by Prasenjit Nath (9735296618)</span>
             </div>
         </div>
     </div>
@@ -59,8 +62,8 @@
             <div class="flex items-center space-x-2.5">
                 <i class="fa-solid fa-school-flag text-xl text-amber-400"></i>
                 <div>
-                    <h1 class="text-sm md:text-base font-bold tracking-wide">FULIA VIDYAMANDIR Master Timetable Portal</h1>
-                    <p class="text-[10px] text-slate-400">Software created by Prasenjit Nath. • Mob : 9735296618</p>
+                    <h1 class="text-sm md:text-base font-bold tracking-wide" id="headerSchoolName">Loading School...</h1>
+                    <p class="text-[10px] text-slate-400">UDISE: <span id="headerUdiseBadge">-----------</span> • Created by Prasenjit Nath</p>
                 </div>
             </div>
             
@@ -93,7 +96,6 @@
                     </select>
                 </div>
 
-                <!-- PUBLISH & SHARE -->
                 <button onclick="publishAndShareCleanLink()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-bold transition flex items-center gap-1.5 shadow-md animate-pulse">
                     <i class="fa-brands fa-whatsapp text-sm"></i> Share Link
                 </button>
@@ -107,8 +109,8 @@
                     <i class="fa-solid fa-file-excel text-rose-400"></i> Export Excel
                 </button>
 
-                <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-600 text-white px-2.5 py-1 rounded text-xs font-semibold transition flex items-center gap-1">
-                    <i class="fa-solid fa-print"></i>
+                <button onclick="handleSchoolLogout()" class="bg-rose-700 hover:bg-rose-600 text-white px-2.5 py-1 rounded text-xs font-semibold transition flex items-center gap-1" title="Logout">
+                    <i class="fa-solid fa-right-from-bracket"></i> Logout
                 </button>
             </div>
         </div>
@@ -197,7 +199,6 @@
 
             <!-- Dual Manager -->
             <div id="sectionDuties" class="hidden lg:grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 no-print">
-                <!-- Class Period OFF -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
                     <div class="flex items-center justify-between pb-1.5 border-b border-slate-200 mb-2">
                         <h3 class="font-bold text-xs text-slate-800 uppercase flex items-center gap-1.5">
@@ -220,7 +221,6 @@
                     <div class="mt-2 pt-1.5 border-t border-slate-100 flex flex-wrap gap-1" id="activeSuspendedBadges"></div>
                 </div>
 
-                <!-- Teacher Program Duty -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
                     <div class="flex items-center justify-between pb-1.5 border-b border-slate-200 mb-2">
                         <h3 class="font-bold text-xs text-slate-800 uppercase flex items-center gap-1.5">
@@ -329,42 +329,70 @@
         </div>
     </div>
 
-    <!-- Core Engine -->
+    <!-- Core Engine with Multi-School Firebase Auth & Isolation -->
     <script>
-        function checkSoftwareLicense() {
-            const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
-            let activationTimestamp = localStorage.getItem('fv_install_timestamp');
-            if (!activationTimestamp) {
-                activationTimestamp = Date.now().toString();
-                localStorage.setItem('fv_install_timestamp', activationTimestamp);
+        let currentSchoolUdise = localStorage.getItem('current_school_udise') || null;
+        let currentSchoolName = localStorage.getItem('current_school_name') || '';
+
+        async function handleSchoolLogin() {
+            const udise = document.getElementById('loginUdiseInput').value.trim();
+            const pass = document.getElementById('loginPasswordInput').value.trim();
+
+            if (!udise || udise.length !== 11 || !/^\d+$/.test(udise)) {
+                alert("❌ Please enter a valid 11-digit numeric UDISE Code!");
+                return;
             }
-            const currentTimestamp = Date.now();
-            const elapsed = currentTimestamp - parseInt(activationTimestamp, 10);
-            if (elapsed > ONE_MONTH_MS || elapsed < 0) {
-                document.getElementById('licenseLockModal').classList.remove('hidden');
-                return false;
+            if (!pass) {
+                alert("❌ Please enter the school password!");
+                return;
             }
-            return true;
+
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}school_registry/${udise}.json`);
+                const schoolData = await res.json();
+
+                if (!schoolData) {
+                    alert("❌ School not registered with this UDISE Code! Contact developer Prasenjit Nath.");
+                    return;
+                }
+
+                if (schoolData.password === pass) {
+                    localStorage.setItem('current_school_udise', udise);
+                    localStorage.setItem('current_school_name', schoolData.name);
+                    currentSchoolUdise = udise;
+                    currentSchoolName = schoolData.name;
+
+                    document.getElementById('schoolLoginModal').classList.add('hidden');
+                    initPortalForSchool();
+                } else {
+                    alert("❌ Incorrect Password!");
+                }
+            } catch (e) {
+                alert("Connection Error: " + e.message);
+            }
         }
 
-        function submitLicenseRenewal() {
-            const val = document.getElementById('renewalKeyInput').value.trim();
-            if (val === MASTER_RENEWAL_KEY) {
-                localStorage.setItem('fv_install_timestamp', Date.now().toString());
-                document.getElementById('licenseLockModal').classList.add('hidden');
-                alert("✅ License activated successfully!");
+        function handleSchoolLogout() {
+            if (confirm("Logout from current school portal?")) {
+                localStorage.removeItem('current_school_udise');
+                localStorage.removeItem('current_school_name');
                 location.reload();
+            }
+        }
+
+        function checkSchoolAuth() {
+            if (!currentSchoolUdise) {
+                document.getElementById('schoolLoginModal').classList.remove('hidden');
             } else {
-                alert("❌ Invalid Activation Key!");
+                document.getElementById('schoolLoginModal').classList.add('hidden');
+                initPortalForSchool();
             }
         }
 
         const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const ROMAN_MAP = {'V': 5, 'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10, 'XI': 11, 'XII': 12};
         const HS_COMMON_LANGUAGES = ['BEN', 'BENGALI', 'ENG', 'ENGLISH', 'EVS', 'EVC'];
-        const HS_SCIENCE_SUBJECTS = ['PHYS', 'PHYSICS', 'CHEM', 'CHEMISTRY', 'BIOLOGY', 'BIO', 'BIOS', 'LSC', 'L.SC', 'PSC', 'P.SC', 'COM', 'COMA', 'COMS', 'SCIENCE', 'MATH', 'STAT'];
-        const HS_ARTS_SUBJECTS = ['HIST', 'HISTORY', 'GEO', 'GEOGRAPHY', 'POL', 'POLSCIENCE', 'EDU', 'EDUCATION', 'SANS', 'SANSKRIT', 'AP', 'A.P', 'PHIL', 'ECON'];
-
+        
         const SUBJECT_STREAMS = {
             'SCIENCE_MATH': ['MATH', 'SCIENCE', 'PHYS', 'CHEM', 'PSC', 'LSC', 'BIOLOGY', 'BIO', 'BIOS', 'EVS', 'EVC'],
             'LANGUAGES': ['BEN', 'BENGALI', 'ENG', 'ENGLISH', 'SANS', 'SANSKRIT', 'HINDI'],
@@ -381,6 +409,49 @@
             'XI-SC', 'XI-ARTS',
             'XII-SC', 'XII-ARTS'
         ];
+
+        let CLASSES = STANDARD_CLASSES;
+        let TEACHERS = [];
+        let masterSchedule = {};
+        let manualOverrides = {};
+        let suspendedSlots = {};
+        let teacherDutySlots = {};
+
+        let teacherDailyWorkloads = {};
+        let latestGeneratedDailyGrid = {};
+        let latestGeneratedSubstitutions = [];
+
+        function getSchoolStorageKey(key) {
+            return `school_${currentSchoolUdise}_${key}`;
+        }
+
+        function loadSchoolState() {
+            try {
+                TEACHERS = JSON.parse(localStorage.getItem(getSchoolStorageKey('teachers')) || '[]');
+                masterSchedule = JSON.parse(localStorage.getItem(getSchoolStorageKey('master_schedule')) || '{}');
+                manualOverrides = JSON.parse(localStorage.getItem(getSchoolStorageKey('manual_overrides')) || '{}');
+                suspendedSlots = JSON.parse(localStorage.getItem(getSchoolStorageKey('suspended_slots')) || '{}');
+                teacherDutySlots = JSON.parse(localStorage.getItem(getSchoolStorageKey('teacher_duty')) || '{}');
+            } catch(e) {}
+        }
+
+        function saveSchoolState() {
+            try {
+                localStorage.setItem(getSchoolStorageKey('teachers'), JSON.stringify(TEACHERS));
+                localStorage.setItem(getSchoolStorageKey('master_schedule'), JSON.stringify(masterSchedule));
+                localStorage.setItem(getSchoolStorageKey('manual_overrides'), JSON.stringify(manualOverrides));
+                localStorage.setItem(getSchoolStorageKey('suspended_slots'), JSON.stringify(suspendedSlots));
+                localStorage.setItem(getSchoolStorageKey('teacher_duty'), JSON.stringify(teacherDutySlots));
+            } catch(e) {}
+        }
+
+        function initPortalForSchool() {
+            safeSetText('headerSchoolName', currentSchoolName || 'School Timetable Portal');
+            safeSetText('headerUdiseBadge', currentSchoolUdise);
+            loadSchoolState();
+            initActivityDropdowns();
+            runAutoSubstitution();
+        }
 
         function safeSetText(elementId, text) {
             const el = document.getElementById(elementId);
@@ -404,52 +475,23 @@
             return 'GENERAL';
         }
 
-        function loadStorage(key, fallback) {
-            try {
-                const raw = localStorage.getItem(key);
-                return raw ? JSON.parse(raw) : fallback;
-            } catch(e) { return fallback; }
-        }
-
-        let CLASSES = loadStorage('hs_classes_joint_v2', STANDARD_CLASSES);
-        let TEACHERS = loadStorage('hs_teachers_joint_v2', []);
-        let masterSchedule = loadStorage('hs_master_schedule_joint_v2', {});
-        let manualOverrides = loadStorage('hs_manual_overrides_joint_v2', {});
-        let suspendedSlots = loadStorage('hs_suspended_slots_joint_v2', {});
-        let teacherDutySlots = loadStorage('hs_teacher_duty_joint_v2', {});
-
-        let teacherDailyWorkloads = {};
-        let latestGeneratedDailyGrid = {};
-        let latestGeneratedSubstitutions = [];
-
-        function saveState() {
-            try {
-                localStorage.setItem('hs_teachers_joint_v2', JSON.stringify(TEACHERS));
-                localStorage.setItem('hs_master_schedule_joint_v2', JSON.stringify(masterSchedule));
-                localStorage.setItem('hs_classes_joint_v2', JSON.stringify(CLASSES));
-                localStorage.setItem('hs_manual_overrides_joint_v2', JSON.stringify(manualOverrides));
-                localStorage.setItem('hs_suspended_slots_joint_v2', JSON.stringify(suspendedSlots));
-                localStorage.setItem('hs_teacher_duty_joint_v2', JSON.stringify(teacherDutySlots));
-            } catch(e) {}
-        }
-
         function resetData() {
-            if (confirm("Reset today's routine changes?\n\n• All teachers will be marked Present\n• All OFF periods & Special Duties will be cleared\n• Your uploaded Master Timetable will remain completely SAFE!")) {
+            if (confirm("Reset today's routine changes?\n\n• All teachers marked Present\n• OFF periods & Special Duties cleared\n• Master timetable remains safe!")) {
                 TEACHERS.forEach(t => t.isPresent = true);
                 suspendedSlots = {};
                 teacherDutySlots = {};
                 manualOverrides = {};
-                saveState();
+                saveSchoolState();
                 renderSuspendedBadges();
                 renderTeacherDutyBadges();
                 runAutoSubstitution();
-                alert("✅ Daily attendance, OFF classes, and duties have been reset to normal!\n\nMaster routine is safe.");
+                alert("✅ Daily attendance & duties reset to normal!");
             }
         }
 
         function clearManualOverrides() {
             manualOverrides = {};
-            saveState();
+            saveSchoolState();
             runAutoSubstitution();
         }
 
@@ -496,9 +538,6 @@
             return true;
         }
 
-        // =========================================================================
-        // SAFE PARSER: PRESERVES WORDS LIKE "SCIENCE" WITHOUT TRUNCATING TO "IENCE"
-        // =========================================================================
         function parseCellClassAndSubject(rawCell) {
             if (!rawCell) return null;
             let val = String(rawCell).trim().replace(/\n/g, ' ');
@@ -516,7 +555,6 @@
                 const isArts = /ARTS|POL|HIST|GEO|SANS|PHIL|EDU/i.test(val);
                 targetClass = isArts ? 'XII-ARTS' : 'XII-SC';
                 subject = val.replace(/^(XII|II\b|II-ARTS|II-SC|XII-ARTS|XII-SC|XII-|II-|I-A|I-B|I-C)\s*/i, '').trim() || 'General';
-                // Only strip hyphenated or standalone prefix like "-SC", "-ARTS" without affecting words like "science"
                 subject = subject.replace(/^[\-\.]\s*(SC|ARTS)\b/i, '').trim();
                 return { targetClass, subject, isHS: true, grade: 'XII' };
             }
@@ -611,14 +649,14 @@
                 suspendedSlots[`${day}_${period}_${cls}`] = { day, period, cls, reason: 'Activity' };
             }
 
-            saveState();
+            saveSchoolState();
             renderSuspendedBadges();
             runAutoSubstitution();
         }
 
         function removeSuspendedSlot(key) {
             delete suspendedSlots[key];
-            saveState();
+            saveSchoolState();
             renderSuspendedBadges();
             runAutoSubstitution();
         }
@@ -656,14 +694,14 @@
                 teacherDutySlots[`${day}_${period}_${tid}`] = { day, period, tid, tname, reason: 'Special Duty' };
             }
 
-            saveState();
+            saveSchoolState();
             renderTeacherDutyBadges();
             runAutoSubstitution();
         }
 
         function removeTeacherDutySlot(key) {
             delete teacherDutySlots[key];
-            saveState();
+            saveSchoolState();
             renderTeacherDutyBadges();
             runAutoSubstitution();
         }
@@ -780,10 +818,10 @@
                     masterSchedule = newMasterSched;
                     manualOverrides = {};
 
-                    saveState();
+                    saveSchoolState();
                     initActivityDropdowns();
                     runAutoSubstitution();
-                    alert("✅ Master routine loaded cleanly!");
+                    alert("✅ Master routine loaded successfully for this school!");
                 } catch (err) {
                     alert("Error: " + err.message);
                 } finally {
@@ -1167,7 +1205,7 @@
                 if (selectedTeacherId === "__AUTO__") delete manualOverrides[`${day}_${period}_${cls}`];
                 else manualOverrides[`${day}_${period}_${cls}`] = selectedTeacherId;
             }
-            saveState();
+            saveSchoolState();
             runAutoSubstitution();
         }
 
@@ -1175,7 +1213,7 @@
             const t = TEACHERS.find(x => x.id === tid);
             if (t) {
                 t.type = newType;
-                saveState();
+                saveSchoolState();
                 runAutoSubstitution();
             }
         }
@@ -1184,7 +1222,7 @@
             const t = TEACHERS.find(x => x.id === tid);
             if (t) {
                 t.isPresent = !t.isPresent;
-                saveState();
+                saveSchoolState();
                 renderTeacherList(document.getElementById('teacherSearch')?.value || '');
                 runAutoSubstitution();
             }
@@ -1192,7 +1230,7 @@
 
         function markAll(present) {
             TEACHERS.forEach(t => t.isPresent = present);
-            saveState();
+            saveSchoolState();
             renderTeacherList();
             runAutoSubstitution();
         }
@@ -1232,7 +1270,7 @@
             });
 
             try {
-                const res = await fetch(`${FIREBASE_DB_URL}todayRoutine.json`, {
+                const res = await fetch(`${FIREBASE_DB_URL}schools_data/${currentSchoolUdise}/todayRoutine.json`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -1243,10 +1281,10 @@
                     baseUrl = baseUrl.replace('index.html', 'teacher.html');
                     if (!baseUrl.endsWith('teacher.html')) baseUrl += 'teacher.html';
 
-                    const msg = `*📢 FULIA VIDYAMANDIR Daily Routine (${day} - ${numPeriods} Periods)*\n\nRespected Teachers, today's schedule has been published. Please open the link and select your name to check your classes:\n\n🔗 ${baseUrl}\n\n_Software created by Prasenjit Nath (9735296618)_`;
+                    const msg = `*📢 ${currentSchoolName} - Daily Routine (${day} - ${numPeriods} Periods)*\n\nRespected Teachers, today's schedule has been published. Please check your classes here:\n\n🔗 ${baseUrl}\n\n_Software created by Prasenjit Nath (9735296618)_`;
                     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
                 } else {
-                    alert("Could not upload to cloud. Please check Firebase rules.");
+                    alert("Could not upload to cloud.");
                 }
             } catch(e) {
                 alert("Cloud Sync Error: " + e.message);
@@ -1321,7 +1359,7 @@
                 }
             }
             XLSX.utils.book_append_sheet(wb, wsTimetable, "Daily_Timetable");
-            XLSX.writeFile(wb, `Daily_Routine_${day}.xlsx`);
+            XLSX.writeFile(wb, `Daily_Routine_${currentSchoolName}_${day}.xlsx`);
         }
 
         document.getElementById('teacherSearch')?.addEventListener('input', (e) => renderTeacherList(e.target.value));
@@ -1344,17 +1382,13 @@
         });
 
         window.onload = () => {
-            if (checkSoftwareLicense()) {
-                const daySelect = document.getElementById('daySelect');
-                const periodSelect = document.getElementById('periodCountSelect');
-                if (daySelect && daySelect.value === 'Saturday') {
-                    periodSelect.value = '4';
-                }
-                initActivityDropdowns();
-                renderSuspendedBadges();
-                renderTeacherDutyBadges();
-                runAutoSubstitution();
+            checkSchoolAuth();
+            const daySelect = document.getElementById('daySelect');
+            const periodSelect = document.getElementById('periodCountSelect');
+            if (daySelect && daySelect.value === 'Saturday') {
+                periodSelect.value = '4';
             }
+            initActivityDropdowns();
         };
     </script>
 </body>
