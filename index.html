@@ -354,42 +354,48 @@
         let currentSchoolName = localStorage.getItem('current_school_name') || '';
 
         async function handleSchoolLogin() {
-            const udise = document.getElementById('loginUdiseInput').value.trim();
-            const pass = document.getElementById('loginPasswordInput').value.trim();
+    const udise = document.getElementById('loginUdiseInput').value.trim();
+    const pass = document.getElementById('loginPasswordInput').value.trim();
 
-            if (!udise || udise.length !== 11 || !/^\d+$/.test(udise)) {
-                alert("❌ Please enter a valid 11-digit numeric UDISE Code!");
-                return;
-            }
-            if (!pass) {
-                alert("❌ Please enter the school password!");
-                return;
-            }
+    if (!udise || udise.length !== 11 || !/^\d+$/.test(udise)) {
+        alert("❌ Sothik 11-digit numeric UDISE Code din!");
+        return;
+    }
+    if (!pass) {
+        alert("❌ School Password din!");
+        return;
+    }
 
-            try {
-                const res = await fetch(`${FIREBASE_DB_URL}school_registry/${udise}.json`);
-                const schoolData = await res.json();
+    try {
+        const res = await fetch(`${FIREBASE_DB_URL}school_registry/${udise}.json`);
+        const schoolData = await res.json();
 
-                if (!schoolData) {
-                    alert("❌ School not registered with this UDISE Code! Contact developer Prasenjit Nath.");
-                    return;
-                }
-
-                if (schoolData.password === pass) {
-                    localStorage.setItem('current_school_udise', udise);
-                    localStorage.setItem('current_school_name', schoolData.name);
-                    currentSchoolUdise = udise;
-                    currentSchoolName = schoolData.name;
-
-                    document.getElementById('schoolLoginModal').classList.add('hidden');
-                    initPortalForSchool();
-                } else {
-                    alert("❌ Incorrect Password!");
-                }
-            } catch (e) {
-                alert("Connection Error: " + e.message);
-            }
+        if (!schoolData) {
+            alert("❌ Ei UDISE Code diye kono school register kora nei!");
+            return;
         }
+
+        // Ekhane status check kora hocche
+        if (schoolData.status === 'suspended') {
+            alert("⚠️ Ei school-ti developer/admin-er madhyome samoyik vabe bondho (Suspended) rakha hoyeche. Ekhon portal-e login kora nishedh!");
+            return;
+        }
+
+        if (schoolData.password === pass) {
+            localStorage.setItem('current_school_udise', udise);
+            localStorage.setItem('current_school_name', schoolData.name);
+            currentSchoolUdise = udise;
+            currentSchoolName = schoolData.name;
+
+            document.getElementById('schoolLoginModal').classList.add('hidden');
+            initPortalForSchool();
+        } else {
+            alert("❌ Bhul Password!");
+        }
+    } catch (e) {
+        alert("Connection Error: " + e.message);
+    }
+}
 
         function handleSchoolLogout() {
             if (confirm("Logout from current school portal?")) {
