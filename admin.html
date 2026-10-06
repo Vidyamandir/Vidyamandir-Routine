@@ -19,7 +19,7 @@
             <h1 class="text-lg font-bold flex items-center gap-2">
                 <i class="fa-solid fa-user-gear text-amber-400"></i> Developer School Registration Panel
             </h1>
-            <p class="text-xs text-slate-400 mt-0.5">Register new schools with 11-digit UDISE codes and passwords.</p>
+            <p class="text-xs text-slate-400 mt-0.5">Register, suspend, or delete schools securely.</p>
         </div>
 
         <div class="p-6 space-y-4">
@@ -40,7 +40,7 @@
                 <input type="password" id="regDevKey" placeholder="Enter Developer Secret Key" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500">
             </div>
 
-            <button onclick="registerNewSchool()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition shadow-md">
+            <button onclick="registerNewSchool()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition shadow-md cursor-pointer">
                 <i class="fa-solid fa-plus mr-1"></i> Register School
             </button>
         </div>
@@ -68,24 +68,58 @@
             }
 
             try {
+                const schoolPayload = {
+                    name: name,
+                    udise: udise,
+                    password: pass,
+                    status: 'active' // ডিফল্টভাবে একটিভ থাকবে
+                };
+
                 const res = await fetch(`${FIREBASE_DB_URL}school_registry/${udise}.json`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, udise, password: pass })
+                    body: JSON.stringify(schoolPayload)
                 });
 
                 if (res.ok) {
-                    alert(`✅ School "${name}" registered successfully with UDISE: ${udise}!`);
+                    alert(`✅ School "${name}" registered successfully!`);
                     document.getElementById('regSchoolName').value = '';
                     document.getElementById('regUdise').value = '';
                     document.getElementById('regPassword').value = '';
                     document.getElementById('regDevKey').value = '';
                     loadRegisteredSchools();
                 } else {
-                    alert("❌ Failed to register school in database.");
+                    alert("❌ Failed to register school.");
                 }
             } catch (e) {
                 alert("Error: " + e.message);
+            }
+        }
+
+        async function toggleSchoolStatus(udise, currentStatus) {
+            const newStatus = (currentStatus === 'suspended') ? 'active' : 'suspended';
+            try {
+                await fetch(`${FIREBASE_DB_URL}school_registry/${udise}/status.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newStatus)
+                });
+                loadRegisteredSchools();
+            } catch (e) {
+                alert("Error updating status: " + e.message);
+            }
+        }
+
+        async function deleteSchool(udise, schoolName) {
+            if (confirm(`⚠️ Are you sure you want to delete "${schoolName}" (${udise})? This action cannot be undone.`)) {
+                try {
+                    await fetch(`${FIREBASE_DB_URL}school_registry/${udise}.json`, {
+                        method: 'DELETE'
+                    });
+                    loadRegisteredSchools();
+                } catch (e) {
+                    alert("Error deleting school: " + e.message);
+                }
             }
         }
 
@@ -102,14 +136,26 @@
 
                 container.innerHTML = '';
                 Object.values(schools).forEach(s => {
+                    const isSuspended = s.status === 'suspended';
                     const div = document.createElement('div');
-                    div.className = "bg-white p-2.5 rounded border border-slate-200 flex justify-between items-center";
+                    div.className = `bg-white p-3 rounded-xl border ${isSuspended ? 'border-rose-300 bg-rose-50/50' : 'border-slate-200'} flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2`;
+                    
                     div.innerHTML = `
                         <div>
                             <div class="font-bold text-slate-800">${s.name}</div>
-                            <div class="text-[10px] text-slate-500">UDISE: <b>${s.udise}</b> | Password: <code>${s.password}</code></div>
+                            <div class="text-[10px] text-slate-500">UDISE: <b>${s.udise}</b> | Pass: <code>${s.password}</code></div>
                         </div>
-                        <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">Active</span>
+                        <div class="flex items-center gap-1.5 self-end sm:self-center">
+                            <span class="px-2 py-0.5 text-[10px] font-bold rounded ${isSuspended ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'}">
+                                ${isSuspended ? 'Suspended' : 'Active'}
+                            </span>
+                            <button onclick="toggleSchoolStatus('${s.udise}', '${s.status || 'active'}')" class="px-2 py-1 text-[10px] font-bold rounded bg-amber-100 text-amber-800 hover:bg-amber-200 transition cursor-pointer" title="Suspend or Activate">
+                                ${isSuspended ? '<i class="fa-solid fa-play"></i> Active' : '<i class="fa-solid fa-ban"></i> Suspend'}
+                            </button>
+                            <button onclick="deleteSchool('${s.udise}', '${s.name}')" class="px-2 py-1 text-[10px] font-bold rounded bg-rose-600 text-white hover:bg-rose-700 transition cursor-pointer" title="Delete School">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
                     `;
                     container.appendChild(div);
                 });
