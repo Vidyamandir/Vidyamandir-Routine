@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teacher Daily Routine Slip</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @media print { .no-print { display: none !important; } body { background: white !important; } }
@@ -24,7 +26,7 @@
             <h1 class="text-base font-bold tracking-wide">Teacher Daily Routine Slip</h1>
             <div class="mt-1 flex items-center justify-center gap-2 text-xs text-slate-300">
                 <span id="activeDayBadge" class="bg-indigo-900 px-2.5 py-0.5 rounded font-bold text-amber-300">Loading...</span>
-                <span id="activePeriodsBadge" class="bg-slate-800 px-2 py-0.5 rounded font-medium">8 Periods</span>
+                <span id="activePeriodsBadge" class="bg-slate-800 px-2 py-0.5 rounded font-medium">-- Periods</span>
             </div>
         </div>
 
@@ -56,21 +58,27 @@
 
         async function fetchTodayRoutine() {
             try {
-                const res = await fetch(`${FIREBASE_DB_URL}todayRoutine.json`);
+                // Get UDISE code if stored or fetch from multi-school path if applicable
+                // For safety, checking current school session or default todayRoutine
+                const udise = localStorage.getItem('current_school_udise');
+                const dbPath = udise ? `${FIREBASE_DB_URL}schools_data/${udise}/todayRoutine.json` : `${FIREBASE_DB_URL}todayRoutine.json`;
+
+                const res = await fetch(dbPath);
                 liveData = await res.json();
 
                 if (!liveData || !liveData.teachers) {
                     document.getElementById('routineDisplayArea').innerHTML = `
-                        <div class="text-center text-rose-600 text-xs">
+                        <div class="text-center text-rose-600 text-xs p-4">
                             <i class="fa-solid fa-circle-exclamation text-3xl mb-2"></i>
                             <p class="font-bold">Today's routine has not been published yet!</p>
-                            <p class="text-slate-500 mt-1">Please ask the Headmaster to click 'Share Link' from portal.</p>
+                            <p class="text-slate-500 mt-1">Please ask the portal admin to click 'Share Link' from portal.</p>
                         </div>`;
                     return;
                 }
 
-                document.getElementById('activeDayBadge').innerText = liveData.day;
-                document.getElementById('activePeriodsBadge').innerText = `${liveData.periods} Periods`;
+                document.getElementById('activeDayBadge').innerText = liveData.day || 'Day';
+                const totalPeriods = liveData.periods || 8;
+                document.getElementById('activePeriodsBadge').innerText = `${totalPeriods} Periods`;
                 document.getElementById('updatedTime').innerText = `Updated: ${liveData.updatedAt || 'Today'}`;
 
                 // Populate Dropdown
@@ -85,7 +93,7 @@
                     const t = liveData.teachers[id];
                     const opt = document.createElement('option');
                     opt.value = id;
-                    opt.innerText = `${t.name} (${id}) - ${t.dept}`;
+                    opt.innerText = `${t.name} (${id}) - ${t.dept || 'General'}`;
                     sel.appendChild(opt);
                 });
 
@@ -95,7 +103,7 @@
 
             } catch(e) {
                 document.getElementById('routineDisplayArea').innerHTML = `
-                    <div class="text-center text-rose-500 text-xs">
+                    <div class="text-center text-rose-500 text-xs p-4">
                         <p class="font-bold">Failed to connect to cloud database.</p>
                         <p class="text-slate-400">${e.message}</p>
                     </div>`;
@@ -112,7 +120,7 @@
             }
 
             const t = liveData.teachers[teacherId];
-            const numPeriods = liveData.periods || 8;
+            const numPeriods = parseInt(liveData.periods || 8, 10);
             let cardsHTML = '';
             let classCount = 0;
 
@@ -134,7 +142,7 @@
                             <div class="flex items-center gap-2">
                                 <span class="font-black text-xs text-rose-700 w-12">${pKey}</span>
                                 <div>
-                                    <div class="text-xs font-bold text-rose-900">${cls.c} • <span class="text-slate-800">${cls.s}</span></div>
+                                    <div class="text-xs font-bold text-rose-900">${cls.c} <span class="text-slate-800">(${cls.s})</span></div>
                                     <div class="text-[10px] text-rose-600 font-bold">Substitute Class (For: ${cls.f})</div>
                                 </div>
                             </div>
@@ -147,7 +155,7 @@
                             <div class="flex items-center gap-2">
                                 <span class="font-bold text-xs text-teal-900 w-12">${pKey}</span>
                                 <div>
-                                    <div class="text-xs font-bold text-slate-800">${cls.c} • <span class="text-teal-900 font-semibold">${cls.s}</span></div>
+                                    <div class="text-xs font-bold text-slate-800">${cls.c} <span class="text-teal-900 font-semibold">(${cls.s})</span></div>
                                     <div class="text-[10px] text-slate-500">Regular Class</div>
                                 </div>
                             </div>
@@ -161,7 +169,7 @@
                     <div class="flex justify-between items-center bg-indigo-50 p-2.5 rounded-xl border border-indigo-100">
                         <div>
                             <div class="text-xs font-black text-indigo-950">${t.name}</div>
-                            <div class="text-[10px] text-slate-500">${t.dept}</div>
+                            <div class="text-[10px] text-slate-500">${t.dept || 'General'}</div>
                         </div>
                         <span class="text-xs font-black text-indigo-900 bg-white border border-indigo-200 px-2 py-0.5 rounded-lg shadow-sm">
                             Total: ${classCount} Classes
