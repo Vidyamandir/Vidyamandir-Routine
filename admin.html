@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer Admin Portal - School Registration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 p-4 md:p-8">
+
+    <script>
+        const FIREBASE_DB_URL = "https://school-routine-prasenjit-default-rtdb.firebaseio.com/";
+        const MASTER_DEV_KEY = "FULIA@2026";
+    </script>
+
+    <div class="max-w-xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+        <div class="bg-slate-900 text-white p-5">
+            <h1 class="text-lg font-bold flex items-center gap-2">
+                <i class="fa-solid fa-user-gear text-amber-400"></i> Developer School Registration Panel
+            </h1>
+            <p class="text-xs text-slate-400 mt-0.5">Register new schools with 11-digit UDISE codes and passwords.</p>
+        </div>
+
+        <div class="p-6 space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">School Name:</label>
+                <input type="text" id="regSchoolName" placeholder="e.g. Fulia Vidyamandir" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">UDISE Code (11 Digits - Username):</label>
+                <input type="text" id="regUdise" maxlength="11" placeholder="e.g. 19101234567" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">School Password:</label>
+                <input type="text" id="regPassword" placeholder="Set a secure password" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Developer Master Key:</label>
+                <input type="password" id="regDevKey" placeholder="Enter Developer Secret Key" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500">
+            </div>
+
+            <button onclick="registerNewSchool()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition shadow-md">
+                <i class="fa-solid fa-plus mr-1"></i> Register School
+            </button>
+        </div>
+
+        <div class="bg-slate-50 p-5 border-t border-slate-200">
+            <h2 class="text-xs font-bold text-slate-700 uppercase mb-3"><i class="fa-solid fa-list mr-1"></i> Registered Schools List</h2>
+            <div id="registeredSchoolsList" class="space-y-2 text-xs">Loading registered schools...</div>
+        </div>
+    </div>
+
+    <script>
+        async function registerNewSchool() {
+            const name = document.getElementById('regSchoolName').value.trim();
+            const udise = document.getElementById('regUdise').value.trim();
+            const pass = document.getElementById('regPassword').value.trim();
+            const devKey = document.getElementById('regDevKey').value.trim();
+
+            if (devKey !== MASTER_DEV_KEY) {
+                alert("❌ Invalid Developer Master Key!");
+                return;
+            }
+            if (!name || !udise || udise.length !== 11 || !/^\d+$/.test(udise) || !pass) {
+                alert("❌ Please provide School Name, a valid 11-digit numeric UDISE Code, and Password.");
+                return;
+            }
+
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}school_registry/${udise}.json`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, udise, password: pass })
+                });
+
+                if (res.ok) {
+                    alert(`✅ School "${name}" registered successfully with UDISE: ${udise}!`);
+                    document.getElementById('regSchoolName').value = '';
+                    document.getElementById('regUdise').value = '';
+                    document.getElementById('regPassword').value = '';
+                    document.getElementById('regDevKey').value = '';
+                    loadRegisteredSchools();
+                } else {
+                    alert("❌ Failed to register school in database.");
+                }
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
+        }
+
+        async function loadRegisteredSchools() {
+            const container = document.getElementById('registeredSchoolsList');
+            try {
+                const res = await fetch(`${FIREBASE_DB_URL}school_registry.json`);
+                const schools = await res.json();
+                
+                if (!schools) {
+                    container.innerHTML = '<p class="text-slate-400">No schools registered yet.</p>';
+                    return;
+                }
+
+                container.innerHTML = '';
+                Object.values(schools).forEach(s => {
+                    const div = document.createElement('div');
+                    div.className = "bg-white p-2.5 rounded border border-slate-200 flex justify-between items-center";
+                    div.innerHTML = `
+                        <div>
+                            <div class="font-bold text-slate-800">${s.name}</div>
+                            <div class="text-[10px] text-slate-500">UDISE: <b>${s.udise}</b> | Password: <code>${s.password}</code></div>
+                        </div>
+                        <span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">Active</span>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (e) {
+                container.innerHTML = '<p class="text-red-500">Could not load school list.</p>';
+            }
+        }
+
+        window.onload = loadRegisteredSchools;
+    </script>
+</body>
+</html>
