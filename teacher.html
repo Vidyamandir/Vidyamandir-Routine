@@ -20,13 +20,14 @@
 
     <div class="w-full max-w-md bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
         
-        <!-- Header -->
+        <!-- Header with School Name -->
         <div class="bg-slate-900 text-white p-4 text-center">
-            <i class="fa-solid fa-graduation-cap text-3xl text-amber-400 mb-2"></i>
-            <h1 class="text-base font-bold tracking-wide" id="headerSchoolTitle">School Routine Slip</h1>
-            <div class="mt-1 flex items-center justify-center gap-2 text-xs text-slate-300">
-                <span id="activeDayBadge" class="bg-indigo-900 px-2.5 py-0.5 rounded font-bold text-amber-300">Loading...</span>
-                <span id="activePeriodsBadge" class="bg-slate-800 px-2 py-0.5 rounded font-medium">-- Periods</span>
+            <i class="fa-solid fa-graduation-cap text-3xl text-amber-400 mb-1.5"></i>
+            <h1 class="text-base font-black tracking-wide text-amber-300 uppercase" id="headerSchoolTitle">Loading School...</h1>
+            <p class="text-[11px] text-slate-300 font-semibold">Teacher Daily Routine Slip</p>
+            <div class="mt-2 flex items-center justify-center gap-2 text-xs">
+                <span id="activeDayBadge" class="bg-indigo-900 px-2.5 py-0.5 rounded font-bold text-amber-200">Loading...</span>
+                <span id="activePeriodsBadge" class="bg-slate-800 px-2 py-0.5 rounded font-medium text-slate-300">-- Periods</span>
             </div>
         </div>
 
@@ -58,7 +59,6 @@
 
         async function fetchTodayRoutine() {
             try {
-                // URL থেকে অথবা LocalStorage থেকে স্কুলের UDISE কোড বের করা
                 const urlParams = new URLSearchParams(window.location.search);
                 let udise = urlParams.get('udise') || localStorage.getItem('current_school_udise') || "19101510701";
 
@@ -76,6 +76,8 @@
                     return;
                 }
 
+                // স্কুলের নাম সেট করা
+                document.getElementById('headerSchoolTitle').innerText = liveData.schoolName || 'School Routine Slip';
                 document.getElementById('activeDayBadge').innerText = liveData.day || 'Day';
                 const totalPeriods = liveData.periods || 8;
                 document.getElementById('activePeriodsBadge').innerText = `${totalPeriods} Periods`;
